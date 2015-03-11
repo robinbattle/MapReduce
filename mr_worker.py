@@ -24,6 +24,7 @@ class Worker(object):
         print '[Worker] Ping from Master'
 
     def do_work(self, data_dir, filenames, work_type):
+
         if work_type == "map":
             for filename in filenames:
                 print "map_" + filename
@@ -33,6 +34,7 @@ class Worker(object):
             for filename in filenames:
                 print "map_" + filename + ", reduce_" + filename
                 self.reduce(data_dir, filename)
+
 
     def update_work_status_async(self, filename):
         c = zerorpc.Client()

@@ -5,7 +5,7 @@ import sys
 
 import zerorpc
 import gevent
-
+from threading import Lock
 
 
 class Master(object):
@@ -16,9 +16,11 @@ class Master(object):
         self.workers = {}
         self.works = []
         self.all_works = []
+        self.lock = Lock()
 
     def controller(self):
         while True:
+
             print '[Master:%s] ' % (self.state),
             for w in self.workers:
                 print '(%s,%s,%s)' % (w[0], w[1], self.workers[w][0]),
@@ -30,8 +32,10 @@ class Master(object):
                     else:
                         print self.workers[w][0]
                 except:
-                    #print "Die"
+                    self.lock.acquire()
                     self.workers[w] = ('Die', self.workers[w][1])
+                    self.lock.release()
+                    #self.workers[w] = ('Die', self.workers[w][1])
                     #print self.workers[w][0]
             gevent.sleep(1)
 
@@ -52,37 +56,81 @@ class Master(object):
         self.works.remove(work_done)
         print self.works
 
+    def alived_worker(self):
+        self.lock.acquire()
+        count = 0
+        for w in self.workers:
+            if self.workers[w][0] != 'Die':
+                count += 1
+        self.lock.release()
+        return count
+
+
     def do_job(self):
-        n = len(self.workers)
-        chunk = len(self.works) / n
-        i = 0
-        offset = 0
-        procs = []
 
-        while len(self.works) > 0:
+        while True:
 
+            # init
+            n = self.alived_worker()
+            chunk = len(self.works) / n
+            i = 0
+            offset = 0
+            procs = []
+
+            # break condition
+            if len(self.works) <= 0:
+                gevent.sleep(1)
+                break
+
+            # map
+            self.lock.acquire()
+            print "workers: " + str(n)
             for w in self.workers:
+                if self.workers[w][0] == 'Die':
+                    continue
                 if i == (n - 1):
                     filenames = self.works[offset:]
                 else:
                     filenames = self.works[offset:offset+chunk]
                 proc = gevent.spawn(self.workers[w][1].do_work, data_dir, filenames, 'map')
+                print proc
                 procs.append(proc)
 
-                i = i + 1
-                offset = offset + chunk
+                i += 1
+                offset += chunk
+            self.lock.release()
 
-            print gevent.joinall(procs)
+
+            gevent.joinall(procs)
+
+            gevent.sleep(1)
+
+        print "##### start mapping "
 
         # restore work list
         self.works = self.all_works[:]
-        print "self.works " + str(self.works)
 
-        while len(self.works) > 0:
-            procs = []
+        while True:
+
+            # init
+            n = self.alived_worker()
+            chunk = len(self.works) / n
             i = 0
             offset = 0
+            procs = []
+
+            # break condition
+            if len(self.works) <= 0:
+                gevent.sleep(1)
+                break
+
+            # map
+            self.lock.acquire()
+            print "workers: " + str(n)
             for w in self.workers:
+                if self.workers[w][0] == 'Die':
+                    continue
+
                 if i == (n - 1):
                     filenames = self.works[offset:]
                 else:
@@ -90,10 +138,16 @@ class Master(object):
                 proc = gevent.spawn(self.workers[w][1].do_work, data_dir, filenames, 'reduce')
                 procs.append(proc)
 
-                i = i + 1
-                offset = offset + chunk
+                i += 1
+                offset += chunk
 
+            self.lock.release()
             gevent.joinall(procs)
+
+
+            print "############### done"
+            gevent.sleep(1)
+
 
         return
 
