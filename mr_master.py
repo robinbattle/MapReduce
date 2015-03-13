@@ -12,9 +12,9 @@ class Master(object):
 
     def __init__(self):
         gevent.spawn(self.controller)
-        self.state = 'READY'
+        self.state = 'Ready'
         self.workers = {}
-        self.works = []
+        self.current_works = []
         self.all_works = []
         self.lock = Lock()
 
@@ -28,7 +28,20 @@ class Master(object):
             for w in self.workers:
                 try:
                     if self.workers[w][0] != 'Die':
-                        self.workers[w][1].ping()
+
+                        worker_status = self.workers[w][1].ping()
+                        work_status = worker_status[0]
+                        print "### checking: " + str(self.workers[w][0])
+                        if self.workers[w][0] != "Finished":
+                            finished_work = worker_status[1]
+                            print "### finished work" + str(finished_work)
+                            for work in finished_work:
+                                if work in self.current_works:
+                                    self.current_works.remove(work)
+                            #self.workers[0] = worker_status
+                            self.workers[w] = (work_status, self.workers[w][1])
+                        elif self.workers[w][0] == "Finished":
+                            self.workers[w] = ("Ready", self.workers[w][1])
                     else:
                         print self.workers[w][0]
                 except:
@@ -53,8 +66,8 @@ class Master(object):
 
 
     def update_work(self, work_done):
-        self.works.remove(work_done)
-        print self.works
+        self.current_works.remove(work_done)
+        print self.current_works
 
     def alived_worker(self):
         self.lock.acquire()
@@ -72,13 +85,13 @@ class Master(object):
 
             # init
             n = self.alived_worker()
-            chunk = len(self.works) / n
+            chunk = len(self.current_works) / n
             i = 0
             offset = 0
             procs = []
 
             # break condition
-            if len(self.works) <= 0:
+            if len(self.current_works) <= 0:
                 gevent.sleep(1)
                 break
 
@@ -89,9 +102,9 @@ class Master(object):
                 if self.workers[w][0] == 'Die':
                     continue
                 if i == (n - 1):
-                    filenames = self.works[offset:]
+                    filenames = self.current_works[offset:]
                 else:
-                    filenames = self.works[offset:offset+chunk]
+                    filenames = self.current_works[offset:offset+chunk]
                 proc = gevent.spawn(self.workers[w][1].do_work, data_dir, filenames, 'map')
                 print proc
                 procs.append(proc)
@@ -108,19 +121,19 @@ class Master(object):
         print "##### end of mapping, start reducing "
 
         # restore work list
-        self.works = self.all_works[:]
+        self.current_works = self.all_works[:]
 
         while True:
 
             # init
             n = self.alived_worker()
-            chunk = len(self.works) / n
+            chunk = len(self.current_works) / n
             i = 0
             offset = 0
             procs = []
 
             # break condition
-            if len(self.works) <= 0:
+            if len(self.current_works) <= 0:
                 gevent.sleep(1)
                 break
 
@@ -132,9 +145,9 @@ class Master(object):
                     continue
 
                 if i == (n - 1):
-                    filenames = self.works[offset:]
+                    filenames = self.current_works[offset:]
                 else:
-                    filenames = self.works[offset:offset+chunk]
+                    filenames = self.current_works[offset:offset+chunk]
                 proc = gevent.spawn(self.workers[w][1].do_work, data_dir, filenames, 'reduce')
                 procs.append(proc)
 
@@ -165,7 +178,7 @@ class Master(object):
             # Now open the output file, join the new slice with newlines
             # and write it out. Then close the file.
             output = open(data_dir + outputBase + str(at) + '.txt', 'w')
-            self.works.append(outputBase + str(at) + '.txt')
+            self.current_works.append(outputBase + str(at) + '.txt')
             self.all_works.append(outputBase + str(at) + '.txt')
             output.write('\n'.join(outputData))
             output.close()

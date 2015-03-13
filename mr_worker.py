@@ -13,6 +13,8 @@ class Worker(object):
 
     def __init__(self):
         gevent.spawn(self.controller)
+        self.finished_works = []
+        self.status = "Ready"
         pass
 
     def controller(self):
@@ -22,19 +24,28 @@ class Worker(object):
 
     def ping(self):
         print '[Worker] Ping from Master'
+        status = self.status
+        finished_works_copy = self.finished_works[:]
+        self.finished_works = []
+        if status == "Finished":
+            self.status = "Ready"
+
+        return status, finished_works_copy
 
     def do_work(self, data_dir, filenames, work_type):
 
         if work_type == "map":
+            self.status = "Working"
             for filename in filenames:
                 print "map_" + filename
                 self.map(data_dir, filename)
-
+            self.status = "Finished"
         elif work_type == "reduce":
+            self.status = "Working"
             for filename in filenames:
                 print "map_" + filename + ", reduce_" + filename
                 self.reduce(data_dir, filename)
-
+            self.status = "Finished"
 
     def update_work_status_async(self, filename):
         c = zerorpc.Client()
@@ -54,7 +65,8 @@ class Worker(object):
         output.close()
 
         # update work status
-        self.update_work_status_async(filename)
+        self.finished_works.append(filename)
+        #self.update_work_status_async(filename)
 
 
     def reduce(self, data_dir, filename):
@@ -84,7 +96,8 @@ class Worker(object):
         output.close()
 
         # update work status
-        self.update_work_status_async(filename)
+        self.finished_works.append(filename)
+        #self.update_work_status_async(filename)
 
 
 if __name__ == '__main__':
