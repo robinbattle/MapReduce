@@ -43,7 +43,7 @@ class Master(object):
     def register_async(self, ip, port):
         print '[Master:%s] ' % self.state,
         print 'Registered worker (%s,%s)' % (ip, port)
-        c = zerorpc.Client()
+        c = zerorpc.Client(timeout=0.5)
         c.connect("tcp://" + ip + ':' + port)
         self.workers[(ip,port)] = ('READY', c)
         c.ping()
@@ -105,7 +105,7 @@ class Master(object):
 
             gevent.sleep(1)
 
-        print "##### start mapping "
+        print "##### end of mapping, start reducing "
 
         # restore work list
         self.works = self.all_works[:]
