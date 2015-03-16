@@ -5,7 +5,6 @@ import sys
 
 import zerorpc
 import gevent
-from threading import Lock
 
 
 class Master(object):
@@ -16,7 +15,6 @@ class Master(object):
         self.workers = {}
         self.current_works = []
         self.all_works = []
-        self.lock = Lock()
 
     def controller(self):
         while True:
@@ -38,18 +36,13 @@ class Master(object):
                             for work in finished_work:
                                 if work in self.current_works:
                                     self.current_works.remove(work)
-                            #self.workers[0] = worker_status
                             self.workers[w] = (work_status, self.workers[w][1])
                         elif self.workers[w][0] == "Finished":
                             self.workers[w] = ("Ready", self.workers[w][1])
                     else:
                         print self.workers[w][0]
                 except:
-                    self.lock.acquire()
                     self.workers[w] = ('Die', self.workers[w][1])
-                    self.lock.release()
-                    #self.workers[w] = ('Die', self.workers[w][1])
-                    #print self.workers[w][0]
             gevent.sleep(1)
 
 
@@ -70,19 +63,16 @@ class Master(object):
         print self.current_works
 
     def alived_worker(self):
-        self.lock.acquire()
         count = 0
         for w in self.workers:
             if self.workers[w][0] != 'Die':
                 count += 1
-        self.lock.release()
         return count
 
 
     def do_job(self):
 
         while True:
-
             # init
             n = self.alived_worker()
             chunk = len(self.current_works) / n
@@ -96,7 +86,6 @@ class Master(object):
                 break
 
             # map
-            self.lock.acquire()
             print "workers: " + str(n)
             for w in self.workers:
                 if self.workers[w][0] == 'Die':
@@ -111,7 +100,6 @@ class Master(object):
 
                 i += 1
                 offset += chunk
-            self.lock.release()
 
 
             gevent.joinall(procs)
@@ -138,7 +126,6 @@ class Master(object):
                 break
 
             # map
-            self.lock.acquire()
             print "workers: " + str(n)
             for w in self.workers:
                 if self.workers[w][0] == 'Die':
@@ -154,7 +141,6 @@ class Master(object):
                 i += 1
                 offset += chunk
 
-            self.lock.release()
             gevent.joinall(procs)
 
 
