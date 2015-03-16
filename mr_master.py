@@ -13,8 +13,10 @@ class Master(object):
         gevent.spawn(self.controller)
         self.state = 'Ready'
         self.workers = {}
-        self.current_works = []
+        self.current_map_works = []
+        self.current_reduce_works = []
         self.all_works = []
+        self.ready_to_reduce = False
 
     def controller(self):
         while True:
@@ -23,6 +25,10 @@ class Master(object):
             for w in self.workers:
                 print '(%s,%s,%s)' % (w[0], w[1], self.workers[w][0]),
             print
+
+            print "map work: " + str(self.current_map_works)
+            print "reduce work: " + str(self.current_reduce_works)
+
             for w in self.workers:
                 try:
                     if self.workers[w][0] != 'Die':
@@ -32,10 +38,20 @@ class Master(object):
                         print "### checking: " + str(self.workers[w][0])
                         if self.workers[w][0] != "Finished":
                             finished_work = worker_status[1]
-                            print "### finished work" + str(finished_work)
-                            for work in finished_work:
-                                if work in self.current_works:
-                                    self.current_works.remove(work)
+                            work_type = worker_status[2]
+                            if work_type == "Map":
+                                for work in finished_work:
+                                    if work in self.current_map_works:
+                                        # remove from map work, add into reduce work
+                                        self.current_map_works.remove(work)
+                                        self.current_reduce_works.append(work)
+                                        self.ready_to_reduce = True
+                            elif work_type == "Reduce":
+                                for work in finished_work:
+                                    if work in self.current_reduce_works:
+                                        # remove from reduce work
+                                        self.current_reduce_works.remove(work)
+
                             self.workers[w] = (work_status, self.workers[w][1])
                         elif self.workers[w][0] == "Finished":
                             self.workers[w] = ("Ready", self.workers[w][1])
@@ -57,11 +73,6 @@ class Master(object):
     def register(self, ip, port):
         gevent.spawn(self.register_async, ip, port)
 
-
-    def update_work(self, work_done):
-        self.current_works.remove(work_done)
-        print self.current_works
-
     def alived_worker(self):
         count = 0
         for w in self.workers:
@@ -69,19 +80,18 @@ class Master(object):
                 count += 1
         return count
 
-
-    def do_job(self):
+    def map_job(self):
 
         while True:
             # init
             n = self.alived_worker()
-            chunk = len(self.current_works) / n
+            chunk = len(self.current_map_works) / n
             i = 0
             offset = 0
             procs = []
 
             # break condition
-            if len(self.current_works) <= 0:
+            if len(self.current_map_works) <= 0:
                 gevent.sleep(1)
                 break
 
@@ -91,10 +101,10 @@ class Master(object):
                 if self.workers[w][0] == 'Die':
                     continue
                 if i == (n - 1):
-                    filenames = self.current_works[offset:]
+                    filenames = self.current_map_works[offset:]
                 else:
-                    filenames = self.current_works[offset:offset+chunk]
-                proc = gevent.spawn(self.workers[w][1].do_work, data_dir, filenames, 'map')
+                    filenames = self.current_map_works[offset:offset+chunk]
+                proc = gevent.spawn(self.workers[w][1].do_work, data_dir, filenames, 'Map')
                 print proc
                 procs.append(proc)
 
@@ -106,22 +116,27 @@ class Master(object):
 
             gevent.sleep(1)
 
-        print "##### end of mapping, start reducing "
+        print "##### end of mapping"
 
-        # restore work list
-        self.current_works = self.all_works[:]
+    def reduce_job(self):
 
-        while True:
+        while len(self.current_reduce_works) > 0 or len(self.current_map_works) > 0:
+
+            if len(self.current_reduce_works) == 0:
+                gevent.sleep(1)
+                continue
+
 
             # init
             n = self.alived_worker()
-            chunk = len(self.current_works) / n
+            print "# lived worker: " + str(n)
+            chunk = len(self.current_reduce_works) / n
             i = 0
             offset = 0
             procs = []
 
             # break condition
-            if len(self.current_works) <= 0:
+            if len(self.current_reduce_works) <= 0:
                 gevent.sleep(1)
                 break
 
@@ -132,10 +147,10 @@ class Master(object):
                     continue
 
                 if i == (n - 1):
-                    filenames = self.current_works[offset:]
+                    filenames = self.current_reduce_works[offset:]
                 else:
-                    filenames = self.current_works[offset:offset+chunk]
-                proc = gevent.spawn(self.workers[w][1].do_work, data_dir, filenames, 'reduce')
+                    filenames = self.current_reduce_works[offset:offset+chunk]
+                proc = gevent.spawn(self.workers[w][1].do_work, data_dir, filenames, 'Reduce')
                 procs.append(proc)
 
                 i += 1
@@ -146,12 +161,22 @@ class Master(object):
 
             print "############### done"
             gevent.sleep(1)
+        print "##### end of reducing"
 
+    def do_job(self):
+        gevent.spawn(self.map_job)
 
-        return
+        while not self.ready_to_reduce:
+            print "$$$" + " wait for mapping file"
+            gevent.sleep(0.5)
+            continue
+
+        print "# start reducing"
+        gevent.spawn(self.reduce_job)
+
 
     def split_file(self, filename):
-        splitLen = 150         # 20 lines per file
+        splitLen = 1000         # 20 lines per file
         outputBase = 'output'  # output.1.txt, output.2.txt, etc.
 
         input = open(filename, 'r').read().split('\n')
@@ -164,7 +189,7 @@ class Master(object):
             # Now open the output file, join the new slice with newlines
             # and write it out. Then close the file.
             output = open(data_dir + outputBase + str(at) + '.txt', 'w')
-            self.current_works.append(outputBase + str(at) + '.txt')
+            self.current_map_works.append(outputBase + str(at) + '.txt')
             self.all_works.append(outputBase + str(at) + '.txt')
             output.write('\n'.join(outputData))
             output.close()

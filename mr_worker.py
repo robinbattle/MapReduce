@@ -13,6 +13,7 @@ class Worker(object):
         gevent.spawn(self.controller)
         self.finished_works = []
         self.status = "Ready"
+        self.work_type = "None"
         pass
 
     def controller(self):
@@ -24,11 +25,13 @@ class Worker(object):
         print '[Worker] Ping from Master'
         status = self.status
         finished_works_copy = self.finished_works[:]
+        work_type = self.work_type
         self.finished_works = []
         if status == "Finished":
             self.status = "Ready"
+            self.work_type = "None"
 
-        return status, finished_works_copy
+        return status, finished_works_copy, work_type
 
     def read_from_file(self, data_dir, filename):
         input = open(data_dir + filename, 'r').read().split('\n')
@@ -38,13 +41,13 @@ class Worker(object):
         output = open(data_dir + filename, 'w')
         output.write(str(output_data))
         output.close()
-        pass
 
     def do_work(self, data_dir, filenames, work_type):
         # Set status to "Working"
         self.status = "Working"
+        self.work_type = work_type
 
-        if work_type == "map":
+        if work_type == "Map":
             for filename in filenames:
                 print "map_" + filename
                 input_filename = filename
@@ -53,7 +56,7 @@ class Worker(object):
                 output = self.map(input)
                 self.write_to_file(data_dir, output_filename, output)
                 self.finished_works.append(filename)
-        elif work_type == "reduce":
+        elif work_type == "Reduce":
             for filename in filenames:
                 print "map_" + filename + ", reduce_" + filename
                 input_filename = "map_" + filename
@@ -86,7 +89,13 @@ class Worker(object):
                     continue
 
                 key = elems[0]
-                value = int(elems[1])
+                try:
+                    value = int(elems[1])
+                except:
+                    # this may need to be handle properly later
+                    value = 0
+                    print elems[1]
+
                 if key in d:
                     old_value = int(d[key])
                     d[key] = old_value + value
