@@ -75,32 +75,30 @@ class Worker(object):
         for line in range(0, len(input)):
             words = input[line].split(' ')
             for word in words:
-                s_list.append(word + "=1,")
+                s_list.append(word + "=1\n")
         return ''.join(s_list)
 
 
     def reduce(self, input):
+        d = {}
         for line in range(0, len(input)):
-            maps = input[line].split(',')
-            d = {}
-            for map in maps:
-                elems = map.split("=")
-                if len(elems) != 2:
-                    continue
+            elems = input[line].split('=')
+            if len(elems) != 2:
+                continue
 
-                key = elems[0]
-                try:
-                    value = int(elems[1])
-                except:
-                    # this may need to be handle properly later
-                    value = 0
-                    print elems[1]
+            key = elems[0]
+            try:
+                value = int(elems[1])
+            except:
+                # this may need to be handle properly later
+                value = 0
+                print elems[1]
 
-                if key in d:
-                    old_value = int(d[key])
-                    d[key] = old_value + value
-                else:
-                    d[key] = value
+            if key in d:
+                old_value = int(d[key])
+                d[key] = old_value + value
+            else:
+                d[key] = value
 
         s_list = []
         for key in d:
