@@ -34,28 +34,38 @@ class Master(object):
                     if self.workers[w][0] != 'Die':
 
                         worker_status = self.workers[w][1].ping()
-                        work_status = worker_status[0]
-                        if self.workers[w][0] != "Finished":
+                        map_work_status = worker_status[0]
+                        if self.workers[w][0][0] != "Finished":
                             finished_map_work = worker_status[1]
-                            finished_reduce_work = worker_status[2]
                             for work in finished_map_work:
                                 if work in self.current_map_works:
                                     # remove from map work, add into reduce work
                                     self.current_map_works.remove(work)
                                     self.current_reduce_works.append(work)
                                     self.ready_to_reduce = True
+                            new_status = [map_work_status, self.workers[w][0][1]]
+                            self.workers[w] = (new_status, self.workers[w][1])
+
+                        elif self.workers[w][0][0] == "Finished":
+                            new_status = ["Ready", self.workers[w][0][1]]
+                            self.workers[w] = (new_status, self.workers[w][1])
+
+                        reduce_work_status = worker_status[2]
+                        if self.workers[w][0][1] != "Finished":
+                            finished_reduce_work = worker_status[3]
                             for work in finished_reduce_work:
                                 if work in self.current_reduce_works:
                                     # remove from reduce work
                                     self.current_reduce_works.remove(work)
-
-                            self.workers[w] = (work_status, self.workers[w][1], self.workers[w][2])
-                        elif self.workers[w][0] == "Finished":
-                            self.workers[w] = ("Ready", self.workers[w][1], self.workers[w][2])
+                            new_status = [self.workers[w][0][0], reduce_work_status]
+                            self.workers[w] = (new_status, self.workers[w][1])
+                        elif self.workers[w][0][1] == "Finished":
+                            new_status = [self.workers[w][0][0], "Ready"]
+                            self.workers[w] = (new_status, self.workers[w][1])
                     else:
                         print self.workers[w][0]
                 except:
-                    self.workers[w] = ('Die', self.workers[w][1], self.workers[w][2])
+                    self.workers[w] = ('Die', self.workers[w][1])
             gevent.sleep(1)
 
 
@@ -64,7 +74,7 @@ class Master(object):
         print 'Registered worker (%s,%s)' % (ip, port)
         c = zerorpc.Client(timeout=0.5)
         c.connect("tcp://" + ip + ':' + port)
-        self.workers[(ip,port)] = ('READY', c, [])
+        self.workers[(ip,port)] = (['Ready', 'Ready'], c, [])
         c.ping()
 
     def register(self, ip, port):
@@ -93,22 +103,22 @@ class Master(object):
                 break
 
             # map
-            print "workers: " + str(n)
             for w in self.workers:
                 if self.workers[w][0] == 'Die':
                     continue
-                if self.workers[w][0] == "Working":
+                if self.workers[w][0][0] == "Working":
+                    continue
                     # if worker have already has a Map work
-                    if "Map" in self.workers[w][2]:
-                        continue
+                    #if "Map" in self.workers[w][2]:
+                    #    continue
 
                 if i == (n - 1):
                     filenames = self.current_map_works[offset:]
                 else:
                     filenames = self.current_map_works[offset:offset+chunk]
 
-                self.workers[w][2].append("Map")
-                self.workers[w] = ("Working", self.workers[w][1], self.workers[w][2])
+                new_status = ["Working", self.workers[w][0][1]]
+                self.workers[w] = (new_status, self.workers[w][1])
                 proc = gevent.spawn(self.workers[w][1].do_work, data_dir, filenames, 'Map')
                 procs.append(proc)
 
@@ -133,7 +143,6 @@ class Master(object):
 
             # init
             n = self.alived_worker()
-            print "# lived worker: " + str(n)
             chunk = len(self.current_reduce_works) / n
             i = 0
             offset = 0
@@ -145,23 +154,22 @@ class Master(object):
                 break
 
             # map
-            print "workers: " + str(n)
             for w in self.workers:
                 if self.workers[w][0] == 'Die':
                     continue
-                if self.workers[w][0] == "Working":
+                if self.workers[w][0][1] == "Working":
+                    continue
                     # if worker have already has a Reduce work
-                    if "Reduce" in self.workers[w][2]:
-                        continue
+                    #if "Reduce" in self.workers[w][2]:
+                    #    continue
 
                 if i == (n - 1):
                     filenames = self.current_reduce_works[offset:]
                 else:
                     filenames = self.current_reduce_works[offset:offset+chunk]
 
-                self.workers[w][2].append("Reduce")
-                self.workers[w] = ("Working", self.workers[w][1], self.workers[w][2])
-                #print "give " + str(self.workers[w][1]) + ": " + str(filenames)
+                new_status = [self.workers[w][0][1], "Working"]
+                self.workers[w] = (new_status, self.workers[w][1])
                 proc = gevent.spawn(self.workers[w][1].do_work, data_dir, filenames, 'Reduce')
                 procs.append(proc)
 
@@ -185,7 +193,8 @@ class Master(object):
 
 
     def split_file(self, filename):
-        splitLen = 1000         # 20 lines per file
+        #splitLen = 400000         # 20 lines per file
+        splitLen = 300
         outputBase = 'output'  # output.1.txt, output.2.txt, etc.
 
         input = open(filename, 'r').read().split('\n')

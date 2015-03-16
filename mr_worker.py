@@ -13,7 +13,8 @@ class Worker(object):
         gevent.spawn(self.controller)
         self.finished_map_works = []
         self.finished_reduce_works = []
-        self.status = "Ready"
+        self.map_status = "Ready"
+        self.reduce_status = "Ready"
         pass
 
     def controller(self):
@@ -23,14 +24,19 @@ class Worker(object):
 
     def ping(self):
         print '[Worker] Ping from Master'
-        status = self.status
+        map_status = self.map_status
+        reduce_status = self.reduce_status
         finished_map_works_copy = self.finished_map_works[:]
         finished_reduce_works_copy = self.finished_reduce_works[:]
         self.finished_map_works = []
-        if status == "Finished":
-            self.status = "Ready"
+        self.finished_reduce_works = []
 
-        return status, finished_map_works_copy, finished_reduce_works_copy
+        if map_status == "Finished":
+            self.map_status = "Ready"
+        if reduce_status == "Finished":
+            self.reduce_status = "Ready"
+
+        return map_status, finished_map_works_copy, reduce_status, finished_reduce_works_copy
 
     def read_from_file(self, data_dir, filename):
         input = open(data_dir + filename, 'r').read().split('\n')
@@ -42,10 +48,9 @@ class Worker(object):
         output.close()
 
     def do_work(self, data_dir, filenames, work_type):
-        # Set status to "Working"
-        self.status = "Working"
 
         if work_type == "Map":
+            self.map_status = "Working"
             for filename in filenames:
                 print "map_" + filename
                 input_filename = filename
@@ -54,7 +59,9 @@ class Worker(object):
                 output = self.map(input)
                 self.write_to_file(data_dir, output_filename, output)
                 self.finished_map_works.append(filename)
+            self.map_status = "Finished"
         elif work_type == "Reduce":
+            self.reduce_status = "Working"
             for filename in filenames:
                 print "map_" + filename + ", reduce_" + filename
                 input_filename = "map_" + filename
@@ -64,9 +71,7 @@ class Worker(object):
                 self.write_to_file(data_dir, output_filename, output)
                 # update work status
                 self.finished_reduce_works.append(filename)
-
-        # Set status to "Finished"
-        self.status = "Finished"
+            self.reduce_status = "Finished"
 
     def map(self, input):
         s_list = []
