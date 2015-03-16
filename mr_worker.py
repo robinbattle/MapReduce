@@ -11,9 +11,9 @@ class Worker(object):
 
     def __init__(self):
         gevent.spawn(self.controller)
-        self.finished_works = []
+        self.finished_map_works = []
+        self.finished_reduce_works = []
         self.status = "Ready"
-        self.work_type = "None"
         pass
 
     def controller(self):
@@ -24,14 +24,13 @@ class Worker(object):
     def ping(self):
         print '[Worker] Ping from Master'
         status = self.status
-        finished_works_copy = self.finished_works[:]
-        work_type = self.work_type
-        self.finished_works = []
+        finished_map_works_copy = self.finished_map_works[:]
+        finished_reduce_works_copy = self.finished_reduce_works[:]
+        self.finished_map_works = []
         if status == "Finished":
             self.status = "Ready"
-            self.work_type = "None"
 
-        return status, finished_works_copy, work_type
+        return status, finished_map_works_copy, finished_reduce_works_copy
 
     def read_from_file(self, data_dir, filename):
         input = open(data_dir + filename, 'r').read().split('\n')
@@ -45,7 +44,6 @@ class Worker(object):
     def do_work(self, data_dir, filenames, work_type):
         # Set status to "Working"
         self.status = "Working"
-        self.work_type = work_type
 
         if work_type == "Map":
             for filename in filenames:
@@ -55,7 +53,7 @@ class Worker(object):
                 input = self.read_from_file(data_dir, input_filename)
                 output = self.map(input)
                 self.write_to_file(data_dir, output_filename, output)
-                self.finished_works.append(filename)
+                self.finished_map_works.append(filename)
         elif work_type == "Reduce":
             for filename in filenames:
                 print "map_" + filename + ", reduce_" + filename
@@ -65,7 +63,7 @@ class Worker(object):
                 output = self.reduce(input)
                 self.write_to_file(data_dir, output_filename, output)
                 # update work status
-                self.finished_works.append(filename)
+                self.finished_reduce_works.append(filename)
 
         # Set status to "Finished"
         self.status = "Finished"

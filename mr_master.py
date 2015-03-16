@@ -35,30 +35,27 @@ class Master(object):
 
                         worker_status = self.workers[w][1].ping()
                         work_status = worker_status[0]
-                        print "### checking: " + str(self.workers[w][0])
                         if self.workers[w][0] != "Finished":
-                            finished_work = worker_status[1]
-                            work_type = worker_status[2]
-                            if work_type == "Map":
-                                for work in finished_work:
-                                    if work in self.current_map_works:
-                                        # remove from map work, add into reduce work
-                                        self.current_map_works.remove(work)
-                                        self.current_reduce_works.append(work)
-                                        self.ready_to_reduce = True
-                            elif work_type == "Reduce":
-                                for work in finished_work:
-                                    if work in self.current_reduce_works:
-                                        # remove from reduce work
-                                        self.current_reduce_works.remove(work)
+                            finished_map_work = worker_status[1]
+                            finished_reduce_work = worker_status[2]
+                            for work in finished_map_work:
+                                if work in self.current_map_works:
+                                    # remove from map work, add into reduce work
+                                    self.current_map_works.remove(work)
+                                    self.current_reduce_works.append(work)
+                                    self.ready_to_reduce = True
+                            for work in finished_reduce_work:
+                                if work in self.current_reduce_works:
+                                    # remove from reduce work
+                                    self.current_reduce_works.remove(work)
 
-                            self.workers[w] = (work_status, self.workers[w][1])
+                            self.workers[w] = (work_status, self.workers[w][1], self.workers[w][2])
                         elif self.workers[w][0] == "Finished":
-                            self.workers[w] = ("Ready", self.workers[w][1])
+                            self.workers[w] = ("Ready", self.workers[w][1], self.workers[w][2])
                     else:
                         print self.workers[w][0]
                 except:
-                    self.workers[w] = ('Die', self.workers[w][1])
+                    self.workers[w] = ('Die', self.workers[w][1], self.workers[w][2])
             gevent.sleep(1)
 
 
@@ -67,7 +64,7 @@ class Master(object):
         print 'Registered worker (%s,%s)' % (ip, port)
         c = zerorpc.Client(timeout=0.5)
         c.connect("tcp://" + ip + ':' + port)
-        self.workers[(ip,port)] = ('READY', c)
+        self.workers[(ip,port)] = ('READY', c, [])
         c.ping()
 
     def register(self, ip, port):
@@ -100,12 +97,19 @@ class Master(object):
             for w in self.workers:
                 if self.workers[w][0] == 'Die':
                     continue
+                if self.workers[w][0] == "Working":
+                    # if worker have already has a Map work
+                    if "Map" in self.workers[w][2]:
+                        continue
+
                 if i == (n - 1):
                     filenames = self.current_map_works[offset:]
                 else:
                     filenames = self.current_map_works[offset:offset+chunk]
+
+                self.workers[w][2].append("Map")
+                self.workers[w] = ("Working", self.workers[w][1], self.workers[w][2])
                 proc = gevent.spawn(self.workers[w][1].do_work, data_dir, filenames, 'Map')
-                print proc
                 procs.append(proc)
 
                 i += 1
@@ -114,7 +118,7 @@ class Master(object):
 
             gevent.joinall(procs)
 
-            gevent.sleep(1)
+            gevent.sleep(0.1)
 
         print "##### end of mapping"
 
@@ -145,11 +149,19 @@ class Master(object):
             for w in self.workers:
                 if self.workers[w][0] == 'Die':
                     continue
+                if self.workers[w][0] == "Working":
+                    # if worker have already has a Reduce work
+                    if "Reduce" in self.workers[w][2]:
+                        continue
 
                 if i == (n - 1):
                     filenames = self.current_reduce_works[offset:]
                 else:
                     filenames = self.current_reduce_works[offset:offset+chunk]
+
+                self.workers[w][2].append("Reduce")
+                self.workers[w] = ("Working", self.workers[w][1], self.workers[w][2])
+                #print "give " + str(self.workers[w][1]) + ": " + str(filenames)
                 proc = gevent.spawn(self.workers[w][1].do_work, data_dir, filenames, 'Reduce')
                 procs.append(proc)
 
@@ -157,10 +169,7 @@ class Master(object):
                 offset += chunk
 
             gevent.joinall(procs)
-
-
-            print "############### done"
-            gevent.sleep(1)
+            gevent.sleep(0.1)
         print "##### end of reducing"
 
     def do_job(self):
