@@ -89,6 +89,7 @@ class Master(object):
 
     def map_job(self):
 
+
         while True:
             # init
             n = self.alived_worker()
@@ -168,7 +169,7 @@ class Master(object):
                 else:
                     filenames = self.current_reduce_works[offset:offset+chunk]
 
-                new_status = [self.workers[w][0][1], "Working"]
+                new_status = [self.workers[w][0][0], "Working"]
                 self.workers[w] = (new_status, self.workers[w][1])
                 proc = gevent.spawn(self.workers[w][1].do_work, data_dir, filenames, 'Reduce')
                 procs.append(proc)
@@ -193,27 +194,27 @@ class Master(object):
 
 
     def split_file(self, filename):
-        #splitLen = 400000         # 20 lines per file
-        splitLen = 300
-        outputBase = 'output'  # output.1.txt, output.2.txt, etc.
-
-        input = open(filename, 'r').read().split('\n')
-
-        at = 1
-        for lines in range(0, len(input), splitLen):
-            # First, get the list slice
-            outputData = input[lines:lines+splitLen]
-
-            # Now open the output file, join the new slice with newlines
-            # and write it out. Then close the file.
-            output = open(data_dir + outputBase + str(at) + '.txt', 'w')
-            self.current_map_works.append(outputBase + str(at) + '.txt')
-            self.all_works.append(outputBase + str(at) + '.txt')
-            output.write('\n'.join(outputData))
-            output.close()
-
-            # Increment the counter
-            at += 1
+        # #splitLen = 400000         # 20 lines per file
+        # splitLen = 300
+        # outputBase = 'output'  # output.1.txt, output.2.txt, etc.
+        #
+        # input = open(filename, 'r').read().split('\n')
+        #
+        # at = 1
+        # for lines in range(0, len(input), splitLen):
+        #     # First, get the list slice
+        #     outputData = input[lines:lines+splitLen]
+        #
+        #     # Now open the output file, join the new slice with newlines
+        #     # and write it out. Then close the file.
+        #     output = open(data_dir + outputBase + str(at) + '.txt', 'w')
+        #     self.current_map_works.append(outputBase + str(at) + '.txt')
+        #     self.all_works.append(outputBase + str(at) + '.txt')
+        #     output.write('\n'.join(outputData))
+        #     output.close()
+        #
+        #     # Increment the counter
+        #     at += 1
 
 
 if __name__ == '__main__':

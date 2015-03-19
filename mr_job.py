@@ -14,7 +14,7 @@ if __name__ == '__main__':
 
     filename = sys.argv[2]
 
-    c.split_file(filename)
+    c.split_file(filename, 60)
     c.do_job()
 
 
