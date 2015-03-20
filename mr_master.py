@@ -57,7 +57,7 @@ class Master(object):
                                 del self.map_works_in_progress[w]
 
                             if map_work_status == 'Ready':
-                                print "add back to map worker" + str(w)
+                                #print "add back to map worker" + str(w)
                                 self.map_workers.append(w)
                                 map_work_status = "Ready"
 
@@ -89,11 +89,13 @@ class Master(object):
                         if self.map_works_in_progress[w] not in self.current_map_works:
                             self.current_map_works.append(self.map_works_in_progress[w])
                         del self.map_works_in_progress[w]
-                        print "#######################"
+                        #print "#######################"
 
                     new_w = self.pick_new_reducer()
                     if new_w is not None:
                         self.reduce_workers.append(new_w)
+
+
 
 
 
@@ -166,14 +168,14 @@ class Master(object):
     def map_job(self):
         while len(self.current_map_works) > 0:
             if len(self.map_workers) <= 0:
-                print "all mappers are busy"
+                #print "all mappers are busy"
                 gevent.sleep(0.1)
                 continue
             map_worker_p = self.map_workers.pop()
             map_work_index = self.current_map_works.pop()
             self.map_works_in_progress[map_worker_p] = map_work_index
-            print "map_worker_p:" + str(map_worker_p)
-            print "map_work_index:" + str(map_work_index)
+            #print "map_worker_p:" + str(map_worker_p)
+            #print "map_work_index:" + str(map_work_index)
 
             new_status = ["Working", self.workers[map_worker_p][0][1]]
             self.workers[map_worker_p] = (new_status, self.workers[map_worker_p][1])
@@ -192,7 +194,7 @@ class Master(object):
             len(self.map_works_in_progress.keys()) > 0:
 
 
-            print "########## i am in reducing circle"
+            #print "########## i am in reducing circle"
 
             if len(self.current_reduce_works.keys()) == 0:
                 gevent.sleep(0.1)
@@ -204,18 +206,18 @@ class Master(object):
             ip = reduce_work_list[1]
             port = reduce_work_list[2]
 
-            print "Trannsitting index:" + str(transitting_index)
+            #print "Trannsitting index:" + str(transitting_index)
 
             try:
 
                 index = 0
                 procs = []
-                print "self.reduce_workers: " + str(self.reduce_workers)
+                #print "self.reduce_workers: " + str(self.reduce_workers)
                 for w in self.reduce_workers:
                     print str(w) + str(self.workers[w])
 
                 if self.reducers_not_working() != len(transitting_index):
-                    print "not all reducers ready, wait"
+                    #print "not all reducers ready, wait"
                     gevent.sleep(0.1)
                     continue
 
@@ -238,8 +240,8 @@ class Master(object):
                     index += 1
                 gevent.joinall(procs, raise_error=True)
 
-                print "finished reduce work"
-                print "start output"
+                #print "finished reduce work"
+                #print "start output"
                 procs = []
                 for w in self.reduce_workers:
                     if self.workers[w][0] == 'Die':
@@ -249,24 +251,24 @@ class Master(object):
                     procs.append(proc)
                 gevent.joinall(procs, raise_error=True)
 
-                print "finished output"
+                #print "finished output"
             except zerorpc.TimeoutExpired:
                 self.current_map_works.append(reduce_work_key)
 
                 c = zerorpc.Client(timeout=2)
                 c.connect("tcp://" + ip + ':' + port)
                 c.force_reset_to_map_ready()
-                print ip + ':' + port + " should be ready"
+                #print ip + ':' + port + " should be ready"
 
                 new_w = self.pick_new_reducer()
                 if new_w is not None:
                     self.reduce_workers.append(new_w)
 
-                print "######################################"
-                print "add " + str(reduce_work_key) + " back to self.current_map_work"
-                print "######################################"
+                #print "######################################"
+                #print "add " + str(reduce_work_key) + " back to self.current_map_work"
+                #print "######################################"
 
-            print "delete key"
+            #print "delete key"
             del self.current_reduce_works[reduce_work_key]
 
             gevent.sleep(0.5)
@@ -286,20 +288,17 @@ class Master(object):
         self.split_file()
 
         # create map/reduce worker list
-        #count = 0
-        #for w in self.workers:
-        #    self.map_workers.append(w)
-        #    if count < self.num_reducers:
-        #        self.reduce_workers.append(w)
-        #        count += 1
+        count = 0
+        for w in self.workers:
+            self.map_workers.append(w)
+            if count < self.num_reducers:
+                self.reduce_workers.append(w)
+                count += 1
 
-        self.map_workers.append(('0.0.0.0', '10001'))
-        self.map_workers.append(('0.0.0.0', '10002'))
-        self.reduce_workers.append(('0.0.0.0', '10000'))
-        self.reduce_workers.append(('0.0.0.0', '10001'))
-
-
-
+        #self.map_workers.append(('0.0.0.0', '10001'))
+        #self.map_workers.append(('0.0.0.0', '10002'))
+        #self.reduce_workers.append(('0.0.0.0', '10000'))
+        #self.reduce_workers.append(('0.0.0.0', '10001'))
 
         print "We have " + str(len(self.map_workers)) + " mappers, and " + str(len(self.reduce_workers)) + " reducers"
         print "Mapper: " + str(self.map_workers)

@@ -133,8 +133,8 @@ class Worker(object):
         output = self.map(input)
         self.current_map = output
         self.split_map()
-        print input
-        print output
+        #print input
+        #print output
 
         print "work_index:" + str(work_index)
         print "Trans: " + str(self.transmitting_index)
@@ -143,9 +143,9 @@ class Worker(object):
 
     def do_reduce(self, reduce_work, data_dir, base_filename, index):
         self.reduce_status = "Working"
-        print "*******" + str(reduce_work)
+        #print "*******" + str(reduce_work)
         map_chunk = self.grab_map_chunk(reduce_work)
-        print map_chunk
+        #print map_chunk
 
         if map_chunk == None:
             print "got map chunk: None, please check"
@@ -209,11 +209,11 @@ class Worker(object):
         split_list = []
         offset = 0
 
-        print "chunk:" + str(chunk)
-        print "len: " + str(len(output))
+        #print "chunk:" + str(chunk)
+        #print "len: " + str(len(output))
 
         while offset < len(output):
-            print offset
+            #print offset
 
             if offset + chunk > len(output):
                 work = offset, len(output)
