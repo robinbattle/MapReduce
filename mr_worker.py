@@ -66,12 +66,22 @@ class Worker(object):
         return text
 
     def send_map_chunk(self, index):
+
         start = index[0]
         end = index[1]
-        text = self.current_map[start:end]
-        self.transmitting_index.remove((start, end))
-        print "Trans: " + str(self.transmitting_index)
-        return text
+
+        if (start, end) in self.transmitting_index:
+                text = self.current_map[start:end]
+                self.transmitting_index.remove((start, end))
+                print "Trans: " + str(self.transmitting_index)
+                print "Text: " + str(text)
+                return text
+        else:
+            print "Ask for :" + str(start) + ", " + str(end) + ", but doesnt have it"
+            return None
+
+
+
 
 
 
@@ -82,7 +92,11 @@ class Worker(object):
     def write_to_file(self, data_dir, filename):
         output = open(data_dir + filename, 'w')
 
-        for key in self.reduce_dict.keys():
+        keylist = self.reduce_dict.keys()
+        keylist.sort()
+
+
+        for key in keylist:
             output.write(str(key) + '=' + str(self.reduce_dict[key]) + '\n')
 
         #output.write(str(self.reduce_dict))
@@ -112,6 +126,12 @@ class Worker(object):
         print "*******" + str(reduce_work)
         map_chunk = self.grab_map_chunk(reduce_work)
         print map_chunk
+
+        if map_chunk == None:
+            print "got map chunk: None, please check"
+            self.reduce_status = "Finished"
+            return
+
         self.reduce(map_chunk)
 
         self.write_to_file(data_dir, base_filename + str(index) + ".txt")

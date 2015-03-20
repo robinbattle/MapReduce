@@ -6,6 +6,8 @@ import sys
 import zerorpc
 import gevent
 
+import subprocess
+
 
 class Master(object):
 
@@ -84,6 +86,9 @@ class Master(object):
                                 self.workers[w] = (new_status, self.workers[w][1])
 
                         elif self.workers[w][0][1] == 'Finished':
+                            if w in self.reduce_works_in_progress.keys():
+                                del self.reduce_works_in_progress[w]
+
                             if reduce_work_status == 'Ready':
                                 new_status = [self.workers[w][0][0], reduce_work_status]
                                 self.workers[w] = (new_status, self.workers[w][1])
@@ -92,49 +97,40 @@ class Master(object):
 
                     else:
                         print self.workers[w][0]
-                except:
+                except zerorpc.TimeoutExpired:
                     if w in self.map_works_in_progress:
                         self.current_map_works.append(self.map_works_in_progress[w])
                         del self.map_works_in_progress[w]
                         print "#######################"
 
                     if w in self.reduce_works_in_progress:
-                        reduce_work_list = self.reduce_works_in_progress[w]
+                        reduce_work = self.reduce_works_in_progress[w]
                         new_w = self.pick_new_reducer()
                         if new_w is not None:
                             print "%%%%%%%%%%%%%%%%%%%%%%"
                             print "Add:" + str(new_w)
-                            print "Remove:" + str(w)
+                            #print "Remove:" + str(w)
 
 
                             # add new reducer
                             self.reduce_workers.append(new_w)
                             # remove old reducer
-                            self.reduce_workers.remove(w)
+                            #self.reduce_workers.remove(w)
                             # reassign reduce work in progress
-                            print "reduce_work_list_in_progress:" + str(w) + ">> " + str(reduce_work_list)
-                            for reduce_work in reduce_work_list:
-                                print "Reassign: " + str(reduce_work) + " :" + str(w) + "==>" + str(new_w)
+                            print "reduce_work_in_progress:" + str(w) + ">> " + str(reduce_work)
 
-                                if new_w in self.current_reduce_works:
-                                    self.current_reduce_works[new_w].append((reduce_work[0], reduce_work[1], reduce_work[2]))
-                                else:
-                                    self.current_reduce_works[new_w] = [(reduce_work[0], reduce_work[1], reduce_work[2])]
-                                # dest may fail
+                            print "Reassign: " + str(reduce_work) + " :" + str(w) + "==>" + str(new_w)
+
+                            if new_w in self.current_reduce_works:
+                                self.current_reduce_works[new_w].append((reduce_work[0], reduce_work[1], reduce_work[2]))
+                            else:
+                                self.current_reduce_works[new_w] = [(reduce_work[0], reduce_work[1], reduce_work[2])]
+                            # dest may fail
                             print "new_reduce_works: " + str(self.current_reduce_works)
                         print "************************"
+                        print "because: " + str(w)
 
-                    # temp
-                    for worker in self.current_reduce_works:
-                        reduce_work_list = self.current_reduce_works[worker]
-                        for reduce_work in reduce_work_list:
-                            ip = reduce_work[1]
-                            port = reduce_work[2]
-                            if ip == w[1] and port == w[2]:
-                                reduce_work_list.remove(reduce_work)
-                                print "***************"
-                                print "remove: " + str(reduce_work)
-                                print "***************"
+
 
 
                     self.workers[w] = ('Die', self.workers[w][1])
@@ -143,7 +139,18 @@ class Master(object):
 
     def add_to_reduce_work(self, transmitting_index, ip, port):
         index = 0
+        print "self.reduce_workers: " + str(len(self.reduce_workers))
         for w in self.reduce_workers:
+            if self.workers[w][0] == 'Die':
+                continue
+
+            print "Transmitting_index: " + str(transmitting_index)
+            print "Index: " + str(index)
+
+            if index > len(transmitting_index) - 1:
+                print "break"
+                break
+
             if w in self.current_reduce_works:
                 self.current_reduce_works[w].append((transmitting_index[index], ip, port))
             else:
@@ -155,10 +162,12 @@ class Master(object):
         print "IP:" + str(ip)
         print "Port:" + str(port)
 
-        if w in self.reduce_works_in_progress:
-            self.reduce_works_in_progress[w].append((transmitting_index_elem, ip, port))
-        else:
-            self.reduce_works_in_progress[w] = [(transmitting_index_elem, ip, port)]
+        self.reduce_works_in_progress[w] = (transmitting_index_elem, ip, port)
+
+        #if w in self.reduce_works_in_progress:
+        #    self.reduce_works_in_progress[w].append((transmitting_index_elem, ip, port))
+        #else:
+        #    self.reduce_works_in_progress[w] = [(transmitting_index_elem, ip, port)]
 
 
 
@@ -287,15 +296,24 @@ class Master(object):
         self.split_file()
 
         # create map/reduce worker list
-        count = 0
-        for w in self.workers:
-            self.map_workers.append(w)
+        #count = 0
+        #for w in self.workers:
+        #    self.map_workers.append(w)
+        #    if count < self.num_reducers:
+        #        self.reduce_workers.append(w)
+        #        count += 1
 
-            if count < self.num_reducers:
-                self.reduce_workers.append(w)
-                count += 1
+        self.map_workers.append(('0.0.0.0', '10001'))
+        self.map_workers.append(('0.0.0.0', '10002'))
+        self.reduce_workers.append(('0.0.0.0', '10000'))
+        self.reduce_workers.append(('0.0.0.0', '10001'))
+
+
+
 
         print "We have " + str(len(self.map_workers)) + " mappers, and " + str(len(self.reduce_workers)) + " reducers"
+        print "Mapper: " + str(self.map_workers)
+        print "Reducers:" + str(self.reduce_workers)
 
         procs = []
         # spawn map job
