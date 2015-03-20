@@ -1,6 +1,10 @@
 __author__ = 'blu2'
 import math
+
 import re
+
+import gevent
+import zerorpc
 
 def map(input):
     s_list = []
@@ -72,6 +76,47 @@ def split_map():
 
 
 
+
+class Test(object):
+
+    def fun1(self):
+        #while True:
+        #    print 1
+        #    gevent.sleep(1)
+        pass
+
+    def fun2(self):
+        print 2
+
+
+def foo():
+
+    #print('Running in foo')
+    gevent.sleep(1)
+    int('a')
+    #print('Explicit context switch to foo again')
+
+def bar():
+    #print('Explicit context to bar')
+    gevent.sleep(0)
+    print 1
+    #print('Implicit context switch back to bar')
+
+
+try:
+    procs = []
+    procs.append(gevent.spawn(foo))
+    procs.append(gevent.spawn(bar))
+
+
+
+
+    gevent.joinall(procs, raise_error=True)
+except:
+    print "error"
+
+
+"""
 num_reducers = 3
 chunk = 30
 input = open("file/input.txt", 'r').read()
@@ -95,7 +140,9 @@ for s in a:
 print a
 
 
-"""
+
+
+
 split_list = []
 offset = 0
 print "len: " + str(len(input))

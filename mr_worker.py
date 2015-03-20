@@ -54,6 +54,26 @@ class Worker(object):
 
         return map_status, self.map_work_index, self.transmitting_index, reduce_status
 
+
+    def reset_params(self):
+        self.finished_map_works = []
+        self.finished_reduce_works = []
+        self.map_status = "Ready"
+        self.reduce_status = "Ready"
+        self.map_work_index = 0, 0
+        self.num_reducers = 0
+
+        self.current_map = ""
+        self.transmitting_index = []
+        self.reduce_work = []
+        self.reduce_worker_index = 0
+
+        self.reduce_dict = {}
+
+    def force_reset_to_map_ready(self):
+        self.transmitting_index = []
+        self.map_status = 'Finished'
+
     def grab_map_chunk(self, reduce_work):
         print "try to grab"
         index = reduce_work[0]
@@ -134,10 +154,9 @@ class Worker(object):
 
         self.reduce(map_chunk)
 
-        self.write_to_file(data_dir, base_filename + str(index) + ".txt")
+        #self.write_to_file(data_dir, base_filename + str(index) + ".txt")
 
         self.reduce_status = "Finished"
-
 
 
     def map(self, input):
