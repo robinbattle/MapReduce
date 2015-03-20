@@ -93,7 +93,7 @@ def foo():
 
     #print('Running in foo')
     gevent.sleep(1)
-    int('a')
+    exit(0)
     #print('Explicit context switch to foo again')
 
 def bar():
@@ -102,23 +102,19 @@ def bar():
     print 1
     #print('Implicit context switch back to bar')
 
-print len(open('file/input.txt', 'r').read())
 
 
-"""
-try:
     procs = []
     procs.append(gevent.spawn(foo))
     procs.append(gevent.spawn(bar))
 
+    gevent.joinall(procs)
+
+    while True:
+        continue
 
 
-
-    gevent.joinall(procs, raise_error=True)
-except:
-    print "error"
-
-
+"""
 
 num_reducers = 3
 chunk = 30

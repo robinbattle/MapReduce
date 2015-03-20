@@ -26,6 +26,9 @@ class Master(object):
         self.base_filename = ""
         self.num_reducers = 1
 
+        self.restart = True
+        self.finished = False
+
     def controller(self):
         while True:
 
@@ -94,7 +97,16 @@ class Master(object):
                     new_w = self.pick_new_reducer()
                     if new_w is not None:
                         self.reduce_workers.append(new_w)
-
+                    else:
+                        print "Read to restart"
+                        self.restart = True
+                        self.num_reducers = self.num_avaliable_reducer()
+                        print "$$$$$$$$$$$$$$$$$$$$"
+                        print "%%%%%%%%%%%%%%%%%%%%"
+                        print "@@@@@@@@@@@@@@@@@@@@"
+                        print "$$$$$$$$$$$$$$$$$$$$"
+                        print "%%%%%%%%%%%%%%%%%%%%"
+                        print "@@@@@@@@@@@@@@@@@@@@"
 
 
 
@@ -125,6 +137,14 @@ class Master(object):
                 return w
         return None
 
+    def num_avaliable_reducer(self):
+        count = 0
+        for w in self.reduce_workers:
+            if self.workers[w][0] == 'Die':
+                continue
+            count += 1
+        return count
+
     def reducer_alive(self):
         for w in self.reduce_workers:
             if self.workers[w][0] is not 'Die':
@@ -151,6 +171,9 @@ class Master(object):
         self.current_reduce_works = {}
         self.map_works_in_progress = {}
 
+        self.restart = True
+        self.finished = False
+
         self.input_filename = ""
         self.split_size = 10
         self.base_filename = ""
@@ -167,6 +190,9 @@ class Master(object):
 
     def map_job(self):
         while len(self.current_map_works) > 0:
+            if self.restart:
+                break
+
             if len(self.map_workers) <= 0:
                 #print "all mappers are busy"
                 gevent.sleep(0.1)
@@ -193,6 +219,9 @@ class Master(object):
         while len(self.current_reduce_works.keys()) > 0 or len(self.current_map_works) > 0 or \
             len(self.map_works_in_progress.keys()) > 0:
 
+            if self.restart:
+                break
+
 
             #print "########## i am in reducing circle"
 
@@ -213,13 +242,15 @@ class Master(object):
                 index = 0
                 procs = []
                 #print "self.reduce_workers: " + str(self.reduce_workers)
-                for w in self.reduce_workers:
-                    print str(w) + str(self.workers[w])
+                #for w in self.reduce_workers:
+                #    print str(w) + str(self.workers[w])
 
-                if self.reducers_not_working() != len(transitting_index):
-                    #print "not all reducers ready, wait"
-                    gevent.sleep(0.1)
-                    continue
+
+
+                #if self.reducers_not_working() != len(transitting_index):
+                #    #print "not all reducers ready, wait"
+                #    gevent.sleep(0.1)
+                #    continue
 
                 for w in self.reduce_workers:
                     if self.workers[w][0] == 'Die':
@@ -242,14 +273,15 @@ class Master(object):
 
                 #print "finished reduce work"
                 #print "start output"
-                procs = []
-                for w in self.reduce_workers:
-                    if self.workers[w][0] == 'Die':
-                        continue
-                    file_index = self.reduce_workers.index(w)
-                    proc = gevent.spawn(self.workers[w][1].write_to_file, data_dir, self.base_filename + str(file_index) + ".txt")
-                    procs.append(proc)
-                gevent.joinall(procs, raise_error=True)
+
+                #procs = []
+                #for w in self.reduce_workers:
+                #    if self.workers[w][0] == 'Die':
+                #        continue
+                #    file_index = self.reduce_workers.index(w)
+                #    proc = gevent.spawn(self.workers[w][1].write_to_file, data_dir, self.base_filename + str(file_index) + ".txt")
+                #    procs.append(proc)
+                #gevent.joinall(procs, raise_error=True)
 
                 #print "finished output"
             except zerorpc.TimeoutExpired:
@@ -263,6 +295,16 @@ class Master(object):
                 new_w = self.pick_new_reducer()
                 if new_w is not None:
                     self.reduce_workers.append(new_w)
+                else:
+                    print "HHHHHHHHHHHHHHHHHHHH"
+                    self.restart = True
+                    self.num_reducers = self.num_avaliable_reducer()
+                    print "$$$$$$$$$$$$$$$$$$$$"
+                    print "%%%%%%%%%%%%%%%%%%%%"
+                    print "@@@@@@@@@@@@@@@@@@@@"
+                    print "$$$$$$$$$$$$$$$$$$$$"
+                    print "%%%%%%%%%%%%%%%%%%%%"
+                    print "@@@@@@@@@@@@@@@@@@@@"
 
                 #print "######################################"
                 #print "add " + str(reduce_work_key) + " back to self.current_map_work"
@@ -272,6 +314,9 @@ class Master(object):
             del self.current_reduce_works[reduce_work_key]
 
             gevent.sleep(0.5)
+
+        if not self.restart:
+            self.finished = True
 
     def do_word_count(self, filename, split_size, num_reducers, base_filename):
 
@@ -304,15 +349,30 @@ class Master(object):
         print "Mapper: " + str(self.map_workers)
         print "Reducers:" + str(self.reduce_workers)
 
+
         procs = []
-        # spawn map job
-        procs.append(gevent.spawn(self.map_job))
-        # spawn reduce job
-        procs.append(gevent.spawn(self.reduce_job))
+        while True:
+            if self.restart:
+                print "#############################################################################"
+
+                self.num_reducers = self.num_avaliable_reducer()
+
+                print "self.num_reducers:" + str(self.num_reducers)
+                self.restart = False
+                for proc in procs:
+                    gevent.kill(proc)
+                procs = []
+                # spawn map job
+                procs.append(gevent.spawn(self.map_job))
+                # spawn reduce job
+                procs.append(gevent.spawn(self.reduce_job))
+                gevent.joinall(procs)
+            if self.finished:
+                break
+            gevent.sleep(1)
 
 
 
-        gevent.joinall(procs)
 
 
     def split_file(self):

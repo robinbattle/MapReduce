@@ -94,7 +94,7 @@ class Worker(object):
                 text = self.current_map[start:end]
                 self.transmitting_index.remove((start, end))
                 print "Trans: " + str(self.transmitting_index)
-                print "Text: " + str(text)
+                #print "Text: " + str(text)
                 return text
         else:
             print "Ask for :" + str(start) + ", " + str(end) + ", but doesnt have it"
@@ -154,7 +154,7 @@ class Worker(object):
 
         self.reduce(map_chunk)
 
-        #self.write_to_file(data_dir, base_filename + str(index) + ".txt")
+        self.write_to_file(data_dir, base_filename + str(index) + ".txt")
 
         self.reduce_status = "Finished"
 
