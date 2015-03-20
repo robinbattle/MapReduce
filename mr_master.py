@@ -6,6 +6,8 @@ import sys
 import zerorpc
 import gevent
 
+import subprocess
+
 
 class Master(object):
 
@@ -13,10 +15,16 @@ class Master(object):
         gevent.spawn(self.controller)
         self.state = 'Ready'
         self.workers = {}
+        self.map_workers = []
+        self.reduce_workers = []
         self.current_map_works = []
-        self.current_reduce_works = []
-        self.all_works = []
-        self.ready_to_reduce = False
+        self.current_reduce_works = {}
+        self.map_works_in_progress = {}
+
+        self.input_filename = ""
+        self.split_size = 10
+        self.base_filename = ""
+        self.num_reducers = 1
 
     def controller(self):
         while True:
@@ -26,46 +34,74 @@ class Master(object):
                 print '(%s,%s,%s)' % (w[0], w[1], self.workers[w][0]),
             print
 
-            print "map work: " + str(self.current_map_works)
-            print "reduce work: " + str(self.current_reduce_works)
+            print "current map work:" + str(self.current_map_works)
+            print "current super reduce work:" + str(self.current_reduce_works)
 
             for w in self.workers:
                 try:
                     if self.workers[w][0] != 'Die':
-
                         worker_status = self.workers[w][1].ping()
                         map_work_status = worker_status[0]
-                        if self.workers[w][0][0] != "Finished":
-                            finished_map_work = worker_status[1]
-                            for work in finished_map_work:
-                                if work in self.current_map_works:
-                                    # remove from map work, add into reduce work
-                                    self.current_map_works.remove(work)
-                                    self.current_reduce_works.append(work)
-                                    self.ready_to_reduce = True
-                            new_status = [map_work_status, self.workers[w][0][1]]
-                            self.workers[w] = (new_status, self.workers[w][1])
+                        if self.workers[w][0][0] == 'Working':
+                            if map_work_status == 'Finished':
+                                work_index = worker_status[1]
+                                transmitting_index = worker_status[2]
+                                self.current_reduce_works[work_index[0], work_index[1]] = transmitting_index, w[0], w[1]
+                                map_work_status = "Finished"
 
-                        elif self.workers[w][0][0] == "Finished":
-                            new_status = ["Ready", self.workers[w][0][1]]
-                            self.workers[w] = (new_status, self.workers[w][1])
+                                new_status = [map_work_status, self.workers[w][0][1]]
+                                self.workers[w] = (new_status, self.workers[w][1])
 
-                        reduce_work_status = worker_status[2]
-                        if self.workers[w][0][1] != "Finished":
-                            finished_reduce_work = worker_status[3]
-                            for work in finished_reduce_work:
-                                if work in self.current_reduce_works:
-                                    # remove from reduce work
-                                    self.current_reduce_works.remove(work)
-                            new_status = [self.workers[w][0][0], reduce_work_status]
-                            self.workers[w] = (new_status, self.workers[w][1])
-                        elif self.workers[w][0][1] == "Finished":
-                            new_status = [self.workers[w][0][0], "Ready"]
-                            self.workers[w] = (new_status, self.workers[w][1])
+                        elif self.workers[w][0][0] == 'Finished':
+                            if w in self.map_works_in_progress:
+                                del self.map_works_in_progress[w]
+
+                            if map_work_status == 'Ready':
+                                print "add back to map worker" + str(w)
+                                self.map_workers.append(w)
+                                map_work_status = "Ready"
+
+                                new_status = [map_work_status, self.workers[w][0][1]]
+                                self.workers[w] = (new_status, self.workers[w][1])
+
+                        elif self.workers[w][0][0] == 'Ready':
+                            print "I am (map) ready"
+
+                        reduce_work_status = worker_status[3]
+
+                        if self.workers[w][0][1] == 'Working':
+                            if reduce_work_status == 'Finished' or reduce_work_status == 'Ready':
+                                new_status = [self.workers[w][0][0], reduce_work_status]
+                                self.workers[w] = (new_status, self.workers[w][1])
+
+                        elif self.workers[w][0][1] == 'Finished':
+
+                            if reduce_work_status == 'Ready':
+                                new_status = [self.workers[w][0][0], reduce_work_status]
+                                self.workers[w] = (new_status, self.workers[w][1])
+                        elif self.workers[w][0][1] == 'Ready':
+                            print "I am (reduce) ready"
+
                     else:
-                        print self.workers[w][0]
-                except:
+                        self.workers[w][0]  # do nothing
+                except zerorpc.TimeoutExpired:
+                    if w in self.map_works_in_progress:
+                        if self.map_works_in_progress[w] not in self.current_map_works:
+                            self.current_map_works.append(self.map_works_in_progress[w])
+                        del self.map_works_in_progress[w]
+                        print "#######################"
+
+                    new_w = self.pick_new_reducer()
+                    if new_w is not None:
+                        self.reduce_workers.append(new_w)
+
+
+
+
+
+
                     self.workers[w] = ('Die', self.workers[w][1])
+
             gevent.sleep(1)
 
 
@@ -80,141 +116,229 @@ class Master(object):
     def register(self, ip, port):
         gevent.spawn(self.register_async, ip, port)
 
-    def alived_worker(self):
-        count = 0
+
+    def pick_new_reducer(self):
         for w in self.workers:
-            if self.workers[w][0] != 'Die':
+            if w not in self.reduce_workers:
+                return w
+        return None
+
+    def reducer_alive(self):
+        for w in self.reduce_workers:
+            if self.workers[w][0] is not 'Die':
+                    return w
+        return None
+
+    def reducers_not_working(self):
+        count = 0
+        for w in self.reduce_workers:
+            if self.workers[w][0] == 'Die':
+                continue
+            elif self.workers[w][0][1] == 'Working':
+                continue
+            else:
                 count += 1
         return count
 
+
+    def reset_status(self):
+        self.state = 'Ready'
+        self.map_workers = []
+        self.reduce_workers = []
+        self.current_map_works = []
+        self.current_reduce_works = {}
+        self.map_works_in_progress = {}
+
+        self.input_filename = ""
+        self.split_size = 10
+        self.base_filename = ""
+        self.num_reducers = 1
+
+
+
+        procs = []
+        for w in self.workers:
+            proc = gevent.spawn(self.workers[w][1].reset_params)
+            procs.append(proc)
+
+        gevent.joinall(procs)
+
     def map_job(self):
+        while len(self.current_map_works) > 0:
+            if len(self.map_workers) <= 0:
+                print "all mappers are busy"
+                gevent.sleep(0.1)
+                continue
+            map_worker_p = self.map_workers.pop()
+            map_work_index = self.current_map_works.pop()
+            self.map_works_in_progress[map_worker_p] = map_work_index
+            print "map_worker_p:" + str(map_worker_p)
+            print "map_work_index:" + str(map_work_index)
 
+            new_status = ["Working", self.workers[map_worker_p][0][1]]
+            self.workers[map_worker_p] = (new_status, self.workers[map_worker_p][1])
+            proc = gevent.spawn(self.workers[map_worker_p][1].do_map, data_dir, self.input_filename, map_work_index,
+                                self.num_reducers)
 
-        while True:
-            # init
-            n = self.alived_worker()
-            chunk = len(self.current_map_works) / n
-            i = 0
-            offset = 0
-            procs = []
-
-            # break condition
-            if len(self.current_map_works) <= 0:
-                gevent.sleep(1)
-                break
-
-            # map
-            for w in self.workers:
-                if self.workers[w][0] == 'Die':
-                    continue
-                if self.workers[w][0][0] == "Working":
-                    continue
-                    # if worker have already has a Map work
-                    #if "Map" in self.workers[w][2]:
-                    #    continue
-
-                if i == (n - 1):
-                    filenames = self.current_map_works[offset:]
-                else:
-                    filenames = self.current_map_works[offset:offset+chunk]
-
-                new_status = ["Working", self.workers[w][0][1]]
-                self.workers[w] = (new_status, self.workers[w][1])
-                proc = gevent.spawn(self.workers[w][1].do_work, data_dir, filenames, 'Map')
-                procs.append(proc)
-
-                i += 1
-                offset += chunk
-
-
-            gevent.joinall(procs)
-
-            gevent.sleep(0.1)
+            gevent.sleep(0.5)
 
         print "##### end of mapping"
 
     def reduce_job(self):
+        print "##### start reducing"
 
-        while len(self.current_reduce_works) > 0 or len(self.current_map_works) > 0:
 
-            if len(self.current_reduce_works) == 0:
-                gevent.sleep(1)
+        while len(self.current_reduce_works.keys()) > 0 or len(self.current_map_works) > 0 or \
+            len(self.map_works_in_progress.keys()) > 0:
+
+
+            print "########## i am in reducing circle"
+
+            if len(self.current_reduce_works.keys()) == 0:
+                gevent.sleep(0.1)
                 continue
 
+            reduce_work_key = self.current_reduce_works.keys()[0]
+            reduce_work_list = self.current_reduce_works[reduce_work_key]
+            transitting_index = reduce_work_list[0]
+            ip = reduce_work_list[1]
+            port = reduce_work_list[2]
 
-            # init
-            n = self.alived_worker()
-            chunk = len(self.current_reduce_works) / n
-            i = 0
-            offset = 0
-            procs = []
+            print "Trannsitting index:" + str(transitting_index)
 
-            # break condition
-            if len(self.current_reduce_works) <= 0:
-                gevent.sleep(1)
+            try:
+
+                index = 0
+                procs = []
+                print "self.reduce_workers: " + str(self.reduce_workers)
+                for w in self.reduce_workers:
+                    print str(w) + str(self.workers[w])
+
+                if self.reducers_not_working() != len(transitting_index):
+                    print "not all reducers ready, wait"
+                    gevent.sleep(0.1)
+                    continue
+
+                for w in self.reduce_workers:
+                    if self.workers[w][0] == 'Die':
+                        continue
+                    if self.workers[w][0][1] == 'Working':
+                        continue
+                    new_status = [self.workers[w][0][0], "Working"]
+                    self.workers[w] = (new_status, self.workers[w][1])
+
+                    file_index = self.reduce_workers.index(w)
+                    if index > len(transitting_index) - 1:
+                        break
+                    reduce_index = transitting_index[index]
+                    reduce_work = reduce_index, ip, port
+                    print str(w) + " will do " + str(reduce_work)
+                    proc = gevent.spawn(self.workers[w][1].do_reduce, reduce_work, data_dir, self.base_filename, file_index)
+                    procs.append(proc)
+                    index += 1
+                gevent.joinall(procs, raise_error=True)
+
+                print "finished reduce work"
+                print "start output"
+                procs = []
+                for w in self.reduce_workers:
+                    if self.workers[w][0] == 'Die':
+                        continue
+                    file_index = self.reduce_workers.index(w)
+                    proc = gevent.spawn(self.workers[w][1].write_to_file, data_dir, self.base_filename + str(file_index) + ".txt")
+                    procs.append(proc)
+                gevent.joinall(procs, raise_error=True)
+
+                print "finished output"
+            except zerorpc.TimeoutExpired:
+                self.current_map_works.append(reduce_work_key)
+
+                c = zerorpc.Client(timeout=2)
+                c.connect("tcp://" + ip + ':' + port)
+                c.force_reset_to_map_ready()
+                print ip + ':' + port + " should be ready"
+
+                new_w = self.pick_new_reducer()
+                if new_w is not None:
+                    self.reduce_workers.append(new_w)
+
+                print "######################################"
+                print "add " + str(reduce_work_key) + " back to self.current_map_work"
+                print "######################################"
+
+            print "delete key"
+            del self.current_reduce_works[reduce_work_key]
+
+            gevent.sleep(0.5)
+
+    def do_word_count(self, filename, split_size, num_reducers, base_filename):
+
+        self.reset_status()
+
+
+        # init params
+        self.input_filename = filename
+        self.split_size = int(split_size)
+        self.num_reducers = int(num_reducers)
+        self.base_filename = base_filename
+
+        # split file
+        self.split_file()
+
+        # create map/reduce worker list
+        #count = 0
+        #for w in self.workers:
+        #    self.map_workers.append(w)
+        #    if count < self.num_reducers:
+        #        self.reduce_workers.append(w)
+        #        count += 1
+
+        self.map_workers.append(('0.0.0.0', '10001'))
+        self.map_workers.append(('0.0.0.0', '10002'))
+        self.reduce_workers.append(('0.0.0.0', '10000'))
+        self.reduce_workers.append(('0.0.0.0', '10001'))
+
+
+
+
+        print "We have " + str(len(self.map_workers)) + " mappers, and " + str(len(self.reduce_workers)) + " reducers"
+        print "Mapper: " + str(self.map_workers)
+        print "Reducers:" + str(self.reduce_workers)
+
+        procs = []
+        # spawn map job
+        procs.append(gevent.spawn(self.map_job))
+        # spawn reduce job
+        procs.append(gevent.spawn(self.reduce_job))
+
+
+
+        gevent.joinall(procs)
+
+
+    def split_file(self):
+        chunk = self.split_size
+        input = open(data_dir + self.input_filename, 'r').read()
+
+        split_list = []
+        offset = 0
+
+        while offset < len(input):
+            end = input.find(' ', offset + chunk)
+            if end != -1:
+                new_chunk = end - offset
+                work = offset, offset + new_chunk
+                split_list.append(work)
+                offset += new_chunk
+            else:
+                new_chunk = len(input) - 1 - offset
+                work = offset, offset + new_chunk
+                split_list.append(work)
                 break
 
-            # map
-            for w in self.workers:
-                if self.workers[w][0] == 'Die':
-                    continue
-                if self.workers[w][0][1] == "Working":
-                    continue
-                    # if worker have already has a Reduce work
-                    #if "Reduce" in self.workers[w][2]:
-                    #    continue
+        self.current_map_works = split_list
 
-                if i == (n - 1):
-                    filenames = self.current_reduce_works[offset:]
-                else:
-                    filenames = self.current_reduce_works[offset:offset+chunk]
-
-                new_status = [self.workers[w][0][0], "Working"]
-                self.workers[w] = (new_status, self.workers[w][1])
-                proc = gevent.spawn(self.workers[w][1].do_work, data_dir, filenames, 'Reduce')
-                procs.append(proc)
-
-                i += 1
-                offset += chunk
-
-            gevent.joinall(procs)
-            gevent.sleep(0.1)
-        print "##### end of reducing"
-
-    def do_job(self):
-        gevent.spawn(self.map_job)
-
-        while not self.ready_to_reduce:
-            print "$$$" + " wait for mapping file"
-            gevent.sleep(0.5)
-            continue
-
-        print "# start reducing"
-        gevent.spawn(self.reduce_job)
-
-
-    def split_file(self, filename):
-        # #splitLen = 400000         # 20 lines per file
-        # splitLen = 300
-        # outputBase = 'output'  # output.1.txt, output.2.txt, etc.
-        #
-        # input = open(filename, 'r').read().split('\n')
-        #
-        # at = 1
-        # for lines in range(0, len(input), splitLen):
-        #     # First, get the list slice
-        #     outputData = input[lines:lines+splitLen]
-        #
-        #     # Now open the output file, join the new slice with newlines
-        #     # and write it out. Then close the file.
-        #     output = open(data_dir + outputBase + str(at) + '.txt', 'w')
-        #     self.current_map_works.append(outputBase + str(at) + '.txt')
-        #     self.all_works.append(outputBase + str(at) + '.txt')
-        #     output.write('\n'.join(outputData))
-        #     output.close()
-        #
-        #     # Increment the counter
-        #     at += 1
+        return split_list
 
 
 if __name__ == '__main__':

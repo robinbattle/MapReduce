@@ -102,7 +102,10 @@ def bar():
     print 1
     #print('Implicit context switch back to bar')
 
+print len(open('file/input.txt', 'r').read())
 
+
+"""
 try:
     procs = []
     procs.append(gevent.spawn(foo))
@@ -116,7 +119,7 @@ except:
     print "error"
 
 
-"""
+
 num_reducers = 3
 chunk = 30
 input = open("file/input.txt", 'r').read()

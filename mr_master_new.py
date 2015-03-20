@@ -180,7 +180,7 @@ class Master(object):
             proc = gevent.spawn(self.workers[map_worker_p][1].do_map, data_dir, self.input_filename, map_work_index,
                                 self.num_reducers)
 
-            gevent.sleep(1)
+            gevent.sleep(0.5)
 
         print "##### end of mapping"
 
@@ -195,7 +195,7 @@ class Master(object):
             print "########## i am in reducing circle"
 
             if len(self.current_reduce_works.keys()) == 0:
-                gevent.sleep(0.3)
+                gevent.sleep(0.1)
                 continue
 
             reduce_work_key = self.current_reduce_works.keys()[0]
@@ -216,7 +216,7 @@ class Master(object):
 
                 if self.reducers_not_working() != len(transitting_index):
                     print "not all reducers ready, wait"
-                    gevent.sleep(0.3)
+                    gevent.sleep(0.1)
                     continue
 
                 for w in self.reduce_workers:
@@ -269,7 +269,7 @@ class Master(object):
             print "delete key"
             del self.current_reduce_works[reduce_work_key]
 
-            gevent.sleep(1)
+            gevent.sleep(0.5)
 
     def do_word_count(self, filename, split_size, num_reducers, base_filename):
 
