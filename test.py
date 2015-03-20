@@ -86,6 +86,15 @@ s = re.sub('[^0-9a-zA-Z]+', '', s)
 print s
 
 
+
+a = ["a", "b", "c"]
+
+for s in a:
+    if s == "b":
+        a.remove(s)
+print a
+
+
 """
 split_list = []
 offset = 0

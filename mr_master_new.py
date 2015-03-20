@@ -96,11 +96,42 @@ class Master(object):
                         print "#######################"
 
                     if w in self.reduce_works_in_progress:
-                        reduce_work = self.reduce_works_in_progress[w]
-                        new_w = self.reducer_alive()
+                        reduce_work_list = self.reduce_works_in_progress[w]
+                        new_w = self.pick_new_reducer()
                         if new_w is not None:
-                            self.add_to_reduce_work(reduce_work[0], new_w[0], new_w[1])
+                            print "%%%%%%%%%%%%%%%%%%%%%%"
+                            print "Add:" + str(new_w)
+                            print "Remove:" + str(w)
+
+
+                            # add new reducer
+                            self.reduce_workers.append(new_w)
+                            # remove old reducer
+                            self.reduce_workers.remove(w)
+                            # reassign reduce work in progress
+                            print "reduce_work_list_in_progress:" + str(w) + ">> " + str(reduce_work_list)
+                            for reduce_work in reduce_work_list:
+                                print "Reassign: " + str(reduce_work) + " :" + str(w) + "==>" + str(new_w)
+
+                                if new_w in self.current_reduce_works:
+                                    self.current_reduce_works[new_w].append((reduce_work[0], reduce_work[1], reduce_work[2]))
+                                else:
+                                    self.current_reduce_works[new_w] = [(reduce_work[0], reduce_work[1], reduce_work[2])]
+                                # dest may fail
+                            print "new_reduce_works: " + str(self.current_reduce_works)
                         print "************************"
+
+                    # temp
+                    for worker in self.current_reduce_works:
+                        reduce_work_list = self.current_reduce_works[worker]
+                        for reduce_work in reduce_work_list:
+                            ip = reduce_work[1]
+                            port = reduce_work[2]
+                            if ip == w[1] and port == w[2]:
+                                reduce_work_list.remove(reduce_work)
+                                print "***************"
+                                print "remove: " + str(reduce_work)
+                                print "***************"
 
 
                     self.workers[w] = ('Die', self.workers[w][1])
@@ -116,19 +147,16 @@ class Master(object):
                 self.current_reduce_works[w] = [(transmitting_index[index], ip, port)]
             index += 1
 
-    def add_to_reduce_work_in_process(self, transmitting_index, ip, port):
-        print "Trans: " + str(transmitting_index)
+    def add_to_reduce_work_in_process(self, w, transmitting_index_elem, ip, port):
+        print "Trans: " + str(transmitting_index_elem)
         print "IP:" + str(ip)
         print "Port:" + str(port)
 
+        if w in self.reduce_works_in_progress:
+            self.reduce_works_in_progress[w].append((transmitting_index_elem, ip, port))
+        else:
+            self.reduce_works_in_progress[w] = [(transmitting_index_elem, ip, port)]
 
-        index = 0
-        for w in self.reduce_workers:
-            if w in self.reduce_works_in_progress:
-                self.reduce_works_in_progress[w].append((transmitting_index[index], ip, port))
-            else:
-                self.reduce_works_in_progress[w] = [(transmitting_index[index], ip, port)]
-            index += 1
 
 
     def register_async(self, ip, port):
@@ -141,6 +169,13 @@ class Master(object):
 
     def register(self, ip, port):
         gevent.spawn(self.register_async, ip, port)
+
+
+    def pick_new_reducer(self):
+        for w in self.workers:
+            if w not in self.reduce_workers:
+                return w
+        return None
 
     def reducer_alive(self):
         for w in self.reduce_workers:
@@ -198,13 +233,17 @@ class Master(object):
 
                 new_status = [self.workers[w][0][0], "Working"]
                 self.workers[w] = (new_status, self.workers[w][1])
+
+                if w not in self.current_reduce_works:
+                    continue
+
                 if len(self.current_reduce_works[w]) == 0:
                     continue
                 reduce_work = self.current_reduce_works[w].pop()
 
                 print "Reduce work: " + str(reduce_work)
 
-                self.add_to_reduce_work_in_process(reduce_work[0], reduce_work[1], reduce_work[2])
+                self.add_to_reduce_work_in_process(w, reduce_work[0], reduce_work[1], reduce_work[2])
                 gevent.spawn(self.workers[w][1].do_reduce, reduce_work)
 
             gevent.sleep(1)
