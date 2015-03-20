@@ -12,10 +12,28 @@ if __name__ == '__main__':
     c = zerorpc.Client()
     c.connect(master_addr)
 
-    filename = sys.argv[2]
+    mr_type = sys.argv[2]
 
-    c.split_file(filename, 60)
-    c.do_job()
+    split_size = sys.argv[3]
+
+    num_reducers = sys.argv[4]
+
+    filename = sys.argv[5]
+
+    base_filename = sys.argv[6]
+
+
+
+    if mr_type == 'wordcount':
+        c.do_word_count(filename, split_size, num_reducers, base_filename)
+    else:
+        print "other mr type"
+
+
+
+
+    #c.split_file(filename, 60)
+    #c.do_job()
 
 
 

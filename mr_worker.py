@@ -89,33 +89,6 @@ class Worker(object):
         output.close()
 
 
-    def do_work(self, data_dir, filenames, work_type):
-
-        if work_type == "Map":
-            self.map_status = "Working"
-            for filename in filenames:
-                print "map_" + filename
-                input_filename = filename
-                output_filename = "map_" + filename
-                input = self.read_from_file(data_dir, input_filename)
-                output = self.map(input)
-                self.write_to_file(data_dir, output_filename, output)
-                self.finished_map_works.append(filename)
-            self.map_status = "Finished"
-        elif work_type == "Reduce":
-            self.reduce_status = "Working"
-            for filename in filenames:
-                print "map_" + filename + ", reduce_" + filename
-                input_filename = "map_" + filename
-                output_filename = "reduce_" + filename
-                input = self.read_from_file(data_dir, input_filename)
-                output = self.reduce(input)
-                self.write_to_file(data_dir, output_filename, output)
-                # update work status
-                self.finished_reduce_works.append(filename)
-            self.reduce_status = "Finished"
-
-
     def do_map(self, data_dir, filename, work_index, num_reducers):
         self.num_reducers = num_reducers
         self.map_work_index = work_index
@@ -134,12 +107,14 @@ class Worker(object):
 
         self.map_status = "Finished"
 
-    def do_reduce(self, reduce_work):
+    def do_reduce(self, reduce_work, data_dir, base_filename, index):
         self.reduce_status = "Working"
         print "*******" + str(reduce_work)
         map_chunk = self.grab_map_chunk(reduce_work)
         print map_chunk
         self.reduce(map_chunk)
+
+        self.write_to_file(data_dir, base_filename + str(index) + ".txt")
 
         self.reduce_status = "Finished"
 

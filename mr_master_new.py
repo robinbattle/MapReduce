@@ -23,6 +23,9 @@ class Master(object):
         self.ready_to_reduce = False
 
         self.input_filename = ""
+        self.split_size = 10
+        self.base_filename = ""
+        self.num_reducers = 1
 
     def controller(self):
         while True:
@@ -206,7 +209,8 @@ class Master(object):
 
             new_status = ["Working", self.workers[map_worker_p][0][1]]
             self.workers[map_worker_p] = (new_status, self.workers[map_worker_p][1])
-            proc = gevent.spawn(self.workers[map_worker_p][1].do_map, data_dir, self.input_filename, map_work_index, num_reducers)
+            proc = gevent.spawn(self.workers[map_worker_p][1].do_map, data_dir, self.input_filename, map_work_index,
+                                self.num_reducers)
 
             gevent.sleep(1)
 
@@ -244,16 +248,18 @@ class Master(object):
                 print "Reduce work: " + str(reduce_work)
 
                 self.add_to_reduce_work_in_process(w, reduce_work[0], reduce_work[1], reduce_work[2])
-                gevent.spawn(self.workers[w][1].do_reduce, reduce_work)
+                index = self.reduce_workers.index(w)
+                gevent.spawn(self.workers[w][1].do_reduce, reduce_work, data_dir, self.base_filename, index)
 
             gevent.sleep(1)
 
         print "##### end of reducing"
-        count = 0
-        for w in self.reduce_workers:
-            print "############ write"
-            gevent.spawn(self.workers[w][1].write_to_file, data_dir, "output" + str(count) + ".txt")
-            count += 1
+        print "##############################"
+        #count = 0
+        #for w in self.reduce_workers:
+        #    print "############ write"
+        #    gevent.spawn(self.workers[w][1].write_to_file, data_dir, self.base_filename + str(count) + ".txt")
+        #    count += 1
 
     def dict_is_empty(self, dict):
         for key in dict.keys():
@@ -270,35 +276,38 @@ class Master(object):
             self.current_reduce_works = []
 
 
+    def do_word_count(self, filename, split_size, num_reducers, base_filename):
+        # init params
+        self.input_filename = filename
+        self.split_size = int(split_size)
+        self.num_reducers = int(num_reducers)
+        self.base_filename = base_filename
 
-    def do_job(self):
-        print "in do job"
-        print self.current_map_works
+        # split file
+        self.split_file()
+
+        # create map/reduce worker list
         count = 0
         for w in self.workers:
             self.map_workers.append(w)
 
-            if count < num_reducers:
+            if count < self.num_reducers:
                 self.reduce_workers.append(w)
                 count += 1
 
         print "We have " + str(len(self.map_workers)) + " mappers, and " + str(len(self.reduce_workers)) + " reducers"
 
+        procs = []
+        # spawn map job
+        procs.append(gevent.spawn(self.map_job))
+        # spawn reduce job
+        procs.append(gevent.spawn(self.reduce_job))
 
-        gevent.spawn(self.map_job)
+        gevent.joinall(procs)
 
-        #while not self.ready_to_reduce:
-        #    print "$$$" + " wait for mapping file"
-        #    gevent.sleep(0.5)
-        #    continue
-
-        #print "# start reducing"
-        gevent.spawn(self.reduce_job)
-
-    def split_file(self, filename, split_size):
-        self.input_filename = filename
-        chunk = split_size
-        input = open(data_dir + filename, 'r').read()
+    def split_file(self):
+        chunk = self.split_size
+        input = open(data_dir + self.input_filename, 'r').read()
 
         split_list = []
         offset = 0
@@ -329,8 +338,6 @@ if __name__ == '__main__':
         data_dir += '/'
 
     master_addr = 'tcp://0.0.0.0:' + port
-
-    num_reducers = 1
 
     s = zerorpc.Server(Master())
     s.bind(master_addr)
