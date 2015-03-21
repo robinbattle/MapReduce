@@ -44,13 +44,13 @@ def combine(words):
 
     dictlist = []
     for key, value in d.iteritems():
-        temp = [key, value]
+        temp = str(key) + '=' + str(value)
         dictlist.append(temp)
 
     return dictlist
 
 
-def split_map():
+def split_map(output):
 
     chunk = int(math.ceil(float(len(output))/num_reducers))
     split_list = []
@@ -114,15 +114,76 @@ def bar():
         continue
 
 
+
+
+num_reducers = 2
+chunk = 60
+input = open("file/input2.txt", 'r').read()
+
+
+
+
+split_list = []
+offset = 0
+
+while offset < len(input):
+    end = input.find(' ', offset + chunk)
+    if end != -1:
+        new_chunk = end - offset
+        work = offset, offset + new_chunk
+        split_list.append(work)
+        offset += new_chunk
+    else:
+        new_chunk = len(input) - 1 - offset
+        work = offset, offset + new_chunk
+        split_list.append(work)
+        break
+print split_list
+
+
+reduce_dict = {}
+
+for split in split_list:
+    text = input[split[0]: split[1]]
+    print text
+    s_list = []
+    words = text.split()
+    for word in words:
+        #word = word.replace('\n', '')
+        word = re.sub('[^0-9a-zA-Z]+', '', word)
+        s_list.append(word + "=1")
+        s_list = combine(s_list)
+
+    print s_list
+    print
+
+    for word in s_list:
+            elems = word.split('=')
+            if len(elems) != 2:
+                continue
+            key = elems[0]
+            try:
+                value = int(elems[1])
+            except:
+                # this may need to be handle properly later
+                value = 0
+                print elems[1]
+
+            if key in reduce_dict:
+                old_value = int(reduce_dict[key])
+                reduce_dict[key] = old_value + value
+            else:
+                reduce_dict[key] = value
+
+print reduce_dict
+
+
+
+
+
+#print split_map(input)
+
 """
-
-num_reducers = 3
-chunk = 30
-input = open("file/input.txt", 'r').read()
-
-output = "not working at all be careful haha cool".split()
-print split_map()
-
 
 s = 'h^&ell`.,|o w]{+orld'
 s = s.replace('[^0-9a-zA-Z]+', '')

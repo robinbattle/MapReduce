@@ -100,16 +100,12 @@ class Worker(object):
             print "Ask for :" + str(start) + ", " + str(end) + ", but doesnt have it"
             return None
 
-
-
-
-
-
     def read_from_file(self, data_dir, filename):
         input = open(data_dir + filename, 'r').read()
         return input
 
     def write_to_file(self, data_dir, filename):
+        #print self.reduce_dict
         output = open(data_dir + filename, 'w')
 
         keylist = self.reduce_dict.keys()
@@ -154,7 +150,7 @@ class Worker(object):
 
         self.reduce(map_chunk)
 
-        self.write_to_file(data_dir, base_filename + str(index) + ".txt")
+        #self.write_to_file(data_dir, base_filename + str(index) + ".txt")
 
         self.reduce_status = "Finished"
 
@@ -245,8 +241,6 @@ class Worker(object):
                 old_value = int(self.reduce_dict[key])
                 self.reduce_dict[key] = old_value + value
             else:
-                self.reduce_dict[key] = value
-
 
     def update_reduce_work(self, reduce_works, index):
         self.reduce_worker_index = index
