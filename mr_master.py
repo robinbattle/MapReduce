@@ -116,13 +116,13 @@ class Master(object):
 
                     self.workers[w] = ('Die', self.workers[w][1])
 
-            gevent.sleep(0.01)
+            gevent.sleep(0.03)
 
 
     def register_async(self, ip, port):
         print '[Master:%s] ' % self.state,
         print 'Registered worker (%s,%s)' % (ip, port)
-        c = zerorpc.Client(timeout=0.5)
+        c = zerorpc.Client(timeout=5)
         c.connect("tcp://" + ip + ':' + port)
         self.workers[(ip,port)] = (['Ready', 'Ready'], c, [])
         c.ping()
@@ -204,7 +204,7 @@ class Master(object):
 
             if len(self.map_workers) <= 0:
                 #print "all mappers are busy"
-                gevent.sleep(0.01)
+                gevent.sleep(0.03)
                 continue
             map_worker_p = self.map_workers.pop()
             map_work_index = self.current_map_works.pop()
@@ -217,7 +217,7 @@ class Master(object):
             proc = gevent.spawn(self.workers[map_worker_p][1].do_map, data_dir, self.input_filename, map_work_index,
                                 self.num_reducers)
 
-            gevent.sleep(0.01)
+            gevent.sleep(0.03)
 
         print "##### end of mapping"
 
@@ -228,7 +228,6 @@ class Master(object):
 
         while len(self.current_reduce_works.keys()) > 0 or len(self.current_map_works) > 0 or \
             len(self.map_works_in_progress.keys()) > 0:
-
             if self.restart:
                 break
 
@@ -236,7 +235,7 @@ class Master(object):
             #print "########## i am in reducing circle"
 
             if len(self.current_reduce_works.keys()) == 0:
-                gevent.sleep(0.01)
+                gevent.sleep(0.05)
                 continue
 
             reduce_work_key = self.current_reduce_works.keys()[0]
@@ -257,7 +256,7 @@ class Master(object):
 
                 if self.reducers_working():
                     print "not all reducers ready, wait"
-                    gevent.sleep(0.01)
+                    gevent.sleep(0.03)
                     continue
 
                 for w in self.reduce_workers:
@@ -301,7 +300,7 @@ class Master(object):
             except zerorpc.TimeoutExpired:
                 self.current_map_works.append(reduce_work_key)
 
-                c = zerorpc.Client(timeout=2)
+                c = zerorpc.Client(timeout=5)
                 c.connect("tcp://" + ip + ':' + port)
                 c.force_reset_to_map_ready()
                 #print ip + ':' + port + " should be ready"
@@ -326,14 +325,14 @@ class Master(object):
 
 
 
-            gevent.sleep(0.01)
+            gevent.sleep(0.03)
 
         if not self.restart:
             self.finished = True
 
 
     def receivingReduceFile(self, w, data_dir, filename):
-        c = zerorpc.Client(timeout=2)
+        c = zerorpc.Client(timeout=5)
         c.connect("tcp://" + w[0] + ':' + w[1])
         text = c.send_current_reduce_file_to_master()
 
@@ -366,7 +365,7 @@ class Master(object):
 
         procs = []
         while True:
-            gevent.sleep(0.01)
+            gevent.sleep(0.03)
             if self.restart:
                 print "#############################################################################"
 
@@ -410,7 +409,7 @@ class Master(object):
                 gevent.joinall(procs)
             if self.finished:
                 break
-            gevent.sleep(0.01)
+            gevent.sleep(0.03)
 
 
 
