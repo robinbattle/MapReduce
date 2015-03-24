@@ -5,6 +5,8 @@ import sys
 
 import zerorpc
 
+from datetime import datetime
+
 if __name__ == '__main__':
 
     master_addr = 'tcp://' + sys.argv[1]
@@ -23,13 +25,16 @@ if __name__ == '__main__':
     base_filename = sys.argv[6]
 
 
+    start = datetime.now()
 
     if mr_type == 'wordcount':
         c.do_word_count(filename, split_size, num_reducers, base_filename)
     else:
         print "other mr type"
 
+    end = datetime.now()
 
+    print "It takes " + str((end - start).total_seconds()) + " seconds"
 
 
     #c.split_file(filename, 60)

@@ -116,7 +116,7 @@ class Master(object):
 
                     self.workers[w] = ('Die', self.workers[w][1])
 
-            gevent.sleep(1)
+            gevent.sleep(0.01)
 
 
     def register_async(self, ip, port):
@@ -204,7 +204,7 @@ class Master(object):
 
             if len(self.map_workers) <= 0:
                 #print "all mappers are busy"
-                gevent.sleep(0.1)
+                gevent.sleep(0.01)
                 continue
             map_worker_p = self.map_workers.pop()
             map_work_index = self.current_map_works.pop()
@@ -217,7 +217,7 @@ class Master(object):
             proc = gevent.spawn(self.workers[map_worker_p][1].do_map, data_dir, self.input_filename, map_work_index,
                                 self.num_reducers)
 
-            gevent.sleep(0.5)
+            gevent.sleep(0.01)
 
         print "##### end of mapping"
 
@@ -236,7 +236,7 @@ class Master(object):
             #print "########## i am in reducing circle"
 
             if len(self.current_reduce_works.keys()) == 0:
-                gevent.sleep(0.1)
+                gevent.sleep(0.01)
                 continue
 
             reduce_work_key = self.current_reduce_works.keys()[0]
@@ -257,7 +257,7 @@ class Master(object):
 
                 if self.reducers_working():
                     print "not all reducers ready, wait"
-                    gevent.sleep(0.1)
+                    gevent.sleep(0.01)
                     continue
 
                 for w in self.reduce_workers:
@@ -326,7 +326,7 @@ class Master(object):
 
 
 
-            gevent.sleep(0.5)
+            gevent.sleep(0.01)
 
         if not self.restart:
             self.finished = True
@@ -366,7 +366,7 @@ class Master(object):
 
         procs = []
         while True:
-            gevent.sleep(3)
+            gevent.sleep(0.01)
             if self.restart:
                 print "#############################################################################"
 
@@ -410,7 +410,7 @@ class Master(object):
                 gevent.joinall(procs)
             if self.finished:
                 break
-            gevent.sleep(1)
+            gevent.sleep(0.01)
 
 
 

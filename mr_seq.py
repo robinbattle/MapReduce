@@ -4,6 +4,8 @@ __author__ = 'jtanigawa'
 import sys
 import re
 
+from datetime import datetime
+
 def read_from_file(data_dir, filename):
     input = open(data_dir + filename, 'r').read()
     return input
@@ -66,11 +68,17 @@ if __name__ == '__main__':
     input_filename = sys.argv[3]
     output_filename = sys.argv[4]
 
+    start = datetime.now()
+
     if mr_type == 'wordcount':
         input = read_from_file(data_dir, input_filename)
         map_list = map(input)
         reduce_list = reduce(map_list)
         write_to_file(data_dir, output_filename, reduce_list)
 
+
+    end = datetime.now()
+
+    print "It takes " + str((end - start).total_seconds()) + " seconds"
 
 
