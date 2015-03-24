@@ -178,10 +178,12 @@ for split in split_list:
 print reduce_dict
 
 
-
+""""
 
 
 #print split_map(input)
+
+"""
 
 """
 
@@ -238,3 +240,10 @@ for index in split_list:
 #print split_map()
 
 #print output[0:25]
+
+
+num = 10000
+print num/12 * 12
+
+
+

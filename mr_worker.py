@@ -130,14 +130,20 @@ class Worker(object):
         output.close()
 
 
-    def do_map(self, data_dir, filename, work_index, num_reducers):
+    def do_map(self, data_dir, filename, work_index, num_reducers, type):
         self.num_reducers = num_reducers
         self.map_work_index = work_index
         self.map_status = "Working"
         start = work_index[0]
         end = work_index[1]
         input = self.read_from_file(data_dir, filename)[start:end]
-        output = self.map(input)
+
+        if type == "wordcount":
+            output = self.map(input)
+        else:
+            output = "other type"
+
+
         self.current_map = output
         self.split_map()
         #print input
@@ -148,7 +154,7 @@ class Worker(object):
 
         self.map_status = "Finished"
 
-    def do_reduce(self, reduce_work, data_dir, base_filename, index):
+    def do_reduce(self, reduce_work, data_dir, base_filename, index, type):
         self.reduce_status = "Working"
         #print "*******" + str(reduce_work)
         map_chunk = self.grab_map_chunk(reduce_work)
@@ -159,7 +165,10 @@ class Worker(object):
             self.reduce_status = "Finished"
             return
 
-        self.reduce(map_chunk)
+        if type == "wordcount":
+            self.reduce(map_chunk)
+        else:
+            print "other type"
 
         #self.write_to_file(data_dir, base_filename + str(index) + ".txt")
 

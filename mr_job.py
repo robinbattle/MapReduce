@@ -27,10 +27,8 @@ if __name__ == '__main__':
 
     start = datetime.now()
 
-    if mr_type == 'wordcount':
-        c.do_word_count(filename, split_size, num_reducers, base_filename)
-    else:
-        print "other mr type"
+
+    c.do_work(filename, split_size, num_reducers, base_filename, mr_type)
 
     end = datetime.now()
 

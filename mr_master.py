@@ -40,84 +40,88 @@ class Master(object):
             print "current map work:" + str(self.current_map_works)
             print "current super reduce work:" + str(self.current_reduce_works)
 
-            for w in self.workers:
-                try:
-                    if self.workers[w][0] != 'Die':
-                        worker_status = self.workers[w][1].ping()
-                        map_work_status = worker_status[0]
-                        if self.workers[w][0][0] == 'Working':
-                            if map_work_status == 'Finished':
-                                work_index = worker_status[1]
-                                transmitting_index = worker_status[2]
-                                self.current_reduce_works[work_index[0], work_index[1]] = transmitting_index, w[0], w[1]
-                                map_work_status = "Finished"
 
-                                new_status = [map_work_status, self.workers[w][0][1]]
-                                self.workers[w] = (new_status, self.workers[w][1])
+            try:
 
-                        elif self.workers[w][0][0] == 'Finished':
-                            if w in self.map_works_in_progress:
-                                del self.map_works_in_progress[w]
+                for w in self.workers:
+                    try:
+                        if self.workers[w][0] != 'Die':
+                            worker_status = self.workers[w][1].ping()
+                            map_work_status = worker_status[0]
+                            if self.workers[w][0][0] == 'Working':
+                                if map_work_status == 'Finished':
+                                    work_index = worker_status[1]
+                                    transmitting_index = worker_status[2]
+                                    self.current_reduce_works[work_index[0], work_index[1]] = transmitting_index, w[0], w[1]
+                                    map_work_status = "Finished"
 
-                            if map_work_status == 'Ready':
-                                #print "add back to map worker" + str(w)
-                                self.map_workers.append(w)
-                                map_work_status = "Ready"
+                                    new_status = [map_work_status, self.workers[w][0][1]]
+                                    self.workers[w] = (new_status, self.workers[w][1])
 
-                                new_status = [map_work_status, self.workers[w][0][1]]
-                                self.workers[w] = (new_status, self.workers[w][1])
+                            elif self.workers[w][0][0] == 'Finished':
+                                if w in self.map_works_in_progress:
+                                    del self.map_works_in_progress[w]
 
-                        elif self.workers[w][0][0] == 'Ready':
-                            print "I am (map) ready"
+                                if map_work_status == 'Ready':
+                                    #print "add back to map worker" + str(w)
+                                    self.map_workers.append(w)
+                                    map_work_status = "Ready"
 
-                        reduce_work_status = worker_status[3]
+                                    new_status = [map_work_status, self.workers[w][0][1]]
+                                    self.workers[w] = (new_status, self.workers[w][1])
 
-                        if self.workers[w][0][1] == 'Working':
-                            if reduce_work_status == 'Finished' or reduce_work_status == 'Ready':
-                                new_status = [self.workers[w][0][0], reduce_work_status]
-                                self.workers[w] = (new_status, self.workers[w][1])
+                            elif self.workers[w][0][0] == 'Ready':
+                                print "I am (map) ready"
 
-                        elif self.workers[w][0][1] == 'Finished':
+                            reduce_work_status = worker_status[3]
 
-                            if reduce_work_status == 'Ready':
-                                new_status = [self.workers[w][0][0], reduce_work_status]
-                                self.workers[w] = (new_status, self.workers[w][1])
-                        elif self.workers[w][0][1] == 'Ready':
-                            print "I am (reduce) ready"
+                            if self.workers[w][0][1] == 'Working':
+                                if reduce_work_status == 'Finished' or reduce_work_status == 'Ready':
+                                    new_status = [self.workers[w][0][0], reduce_work_status]
+                                    self.workers[w] = (new_status, self.workers[w][1])
 
-                    else:
-                        self.workers[w][0]  # do nothing
-                except zerorpc.TimeoutExpired:
-                    if w in self.map_works_in_progress:
-                        if self.map_works_in_progress[w] not in self.current_map_works:
-                            self.current_map_works.append(self.map_works_in_progress[w])
-                        del self.map_works_in_progress[w]
-                        #print "#######################"
+                            elif self.workers[w][0][1] == 'Finished':
 
-                    new_w = self.pick_new_reducer()
-                    if new_w is not None:
-                        self.reduce_workers.append(new_w)
-                    else:
-                        print "Read to restart"
-                        self.restart = True
-                        self.num_reducers = self.num_avaliable_reducer()
-                        print "$$$$$$$$$$$$$$$$$$$$"
-                        print "%%%%%%%%%%%%%%%%%%%%"
-                        print "@@@@@@@@@@@@@@@@@@@@"
-                        print "$$$$$$$$$$$$$$$$$$$$"
-                        print "%%%%%%%%%%%%%%%%%%%%"
-                        print "@@@@@@@@@@@@@@@@@@@@"
+                                if reduce_work_status == 'Ready':
+                                    new_status = [self.workers[w][0][0], reduce_work_status]
+                                    self.workers[w] = (new_status, self.workers[w][1])
+                            elif self.workers[w][0][1] == 'Ready':
+                                print "I am (reduce) ready"
 
+                        else:
+                            self.workers[w][0]  # do nothing
+                    except zerorpc.TimeoutExpired:
+                        if w in self.map_works_in_progress:
+                            if self.map_works_in_progress[w] not in self.current_map_works:
+                                self.current_map_works.append(self.map_works_in_progress[w])
+                            del self.map_works_in_progress[w]
+                            #print "#######################"
 
-
-
-
+                        new_w = self.pick_new_reducer()
+                        if new_w is not None:
+                            self.reduce_workers.append(new_w)
+                        else:
+                            print "Read to restart"
+                            self.restart = True
+                            self.num_reducers = self.num_avaliable_reducer()
+                            print "$$$$$$$$$$$$$$$$$$$$"
+                            print "%%%%%%%%%%%%%%%%%%%%"
+                            print "@@@@@@@@@@@@@@@@@@@@"
+                            print "$$$$$$$$$$$$$$$$$$$$"
+                            print "%%%%%%%%%%%%%%%%%%%%"
+                            print "@@@@@@@@@@@@@@@@@@@@"
 
 
-                    self.workers[w] = ('Die', self.workers[w][1])
 
-            gevent.sleep(0.03)
 
+
+
+
+                        self.workers[w] = ('Die', self.workers[w][1])
+
+                gevent.sleep(0.03)
+            except RuntimeError:
+                print "restart controller loop"
 
     def register_async(self, ip, port):
         print '[Master:%s] ' % self.state,
@@ -197,7 +201,7 @@ class Master(object):
 
         gevent.joinall(procs)
 
-    def map_job(self):
+    def map_job(self, type):
         while len(self.current_map_works) > 0:
             if self.restart:
                 break
@@ -215,13 +219,13 @@ class Master(object):
             new_status = ["Working", self.workers[map_worker_p][0][1]]
             self.workers[map_worker_p] = (new_status, self.workers[map_worker_p][1])
             proc = gevent.spawn(self.workers[map_worker_p][1].do_map, data_dir, self.input_filename, map_work_index,
-                                self.num_reducers)
+                                self.num_reducers, type)
 
             gevent.sleep(0.03)
 
         print "##### end of mapping"
 
-    def reduce_job(self):
+    def reduce_job(self, type):
         print "##### start reducing"
         print self.current_map_works
 
@@ -273,7 +277,7 @@ class Master(object):
                     reduce_index = transitting_index[index]
                     reduce_work = reduce_index, ip, port
                     print str(w) + " will do " + str(reduce_work)
-                    proc = gevent.spawn(self.workers[w][1].do_reduce, reduce_work, data_dir, self.base_filename, file_index)
+                    proc = gevent.spawn(self.workers[w][1].do_reduce, reduce_work, data_dir, self.base_filename, file_index, type)
                     procs.append(proc)
                     index += 1
                 gevent.joinall(procs, raise_error=True)
@@ -343,7 +347,7 @@ class Master(object):
 
 
 
-    def do_word_count(self, filename, split_size, num_reducers, base_filename):
+    def do_work(self, filename, split_size, num_reducers, base_filename, type):
 
         self.reset_status()
 
@@ -403,9 +407,9 @@ class Master(object):
                     gevent.kill(proc)
                 procs = []
                 # spawn map job
-                procs.append(gevent.spawn(self.map_job))
+                procs.append(gevent.spawn(self.map_job, type))
                 # spawn reduce job
-                procs.append(gevent.spawn(self.reduce_job))
+                procs.append(gevent.spawn(self.reduce_job, type))
                 gevent.joinall(procs)
             if self.finished:
                 break
