@@ -287,7 +287,9 @@ class Master(object):
                     if self.workers[w][0] == 'Die':
                         continue
                     file_index = self.reduce_workers.index(w)
-                    proc = gevent.spawn(self.workers[w][1].write_to_file, data_dir, self.base_filename + str(file_index) + ".txt")
+                    #proc = gevent.spawn(self.workers[w][1].write_to_file, data_dir, self.base_filename + str(file_index) + ".txt")
+
+                    proc = gevent.spawn(self.receivingReduceFile, w, data_dir, self.base_filename + str(file_index) + ".txt")
                     procs.append(proc)
                 gevent.joinall(procs, raise_error=True)
 
@@ -328,6 +330,19 @@ class Master(object):
 
         if not self.restart:
             self.finished = True
+
+
+    def receivingReduceFile(self, w, data_dir, filename):
+        c = zerorpc.Client(timeout=2)
+        c.connect("tcp://" + w[0] + ':' + w[1])
+        text = c.send_current_reduce_file_to_master()
+
+        output = open(data_dir + filename, 'w')
+        output.write(text)
+        output.close()
+
+
+
 
     def do_word_count(self, filename, split_size, num_reducers, base_filename):
 
