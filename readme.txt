@@ -2,14 +2,14 @@
 python mr_master.py 4242 file
 python mr_master.py 15000 file
 
-2. Worker: [master_ip:port] [self_ip] [self_port]
+2. Worker: [master_ip:port] [self_ip:self_port]
 python mr_worker.py 0.0.0.0:4242 0.0.0.0:10000
-python mr_worker.py bass06.cs.usfca.edu:15000 bass07.cs.usfca.edu:15000
+python mr_worker.py bass06.cs.usfca.edu:15000 bass09.cs.usfca.edu:15000
 
 
 3. Job: [master_ip:port] [function] [split_size] [reducer_num] [input_filename] [output_base_name]
 python mr_job.py 0.0.0.0:4242 wordcount 500000 3 input3.txt output
-python mr_job.py bass08.cs.usfca.edu:150000 wordcount 500000 3 bigtext.txt output
+python mr_job.py bass06.cs.usfca.edu:150000 wordcount 500000 3 bigtext.txt output
 
 4. Collect: [output_base_name] [output_filename] [data_dir]
 python mr_collect.py output output_all file
