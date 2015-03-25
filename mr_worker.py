@@ -274,9 +274,12 @@ if __name__ == '__main__':
     master_addr = "tcp://" + sys.argv[1]
 
     s = zerorpc.Server(Worker())
-    ip = sys.argv[1]
-    port = sys.argv[2]
-    s.bind('tcp://' + ip + ':' + port)
+    worker_addr= "tcp://" + sys.argv[2]
+
+    pair = sys.argv[2].split(':')
+    ip = pair[0]
+    port = pair[1]
+    s.bind(worker_addr)
     c = zerorpc.Client()
     c.connect(master_addr)
     c.register(ip, port)

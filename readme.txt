@@ -3,8 +3,8 @@ python mr_master.py 4242 file
 python mr_master.py 15000 file
 
 2. Worker: [master_ip:port] [self_ip] [self_port]
-python mr_worker.py 0.0.0.0:4242 10000
-python mr_worker.py bass08.cs.usfca.edu:15000 15001
+python mr_worker.py 0.0.0.0:4242 0.0.0.0:10000
+python mr_worker.py bass08.cs.usfca.edu:15000 bass06.cs.usfca.edu:15001
 
 
 3. Job: [master_ip:port] [function] [split_size] [reducer_num] [input_filename] [output_base_name]
