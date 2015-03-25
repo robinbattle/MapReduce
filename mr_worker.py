@@ -279,7 +279,7 @@ if __name__ == '__main__':
     pair = sys.argv[2].split(':')
     ip = pair[0]
     port = pair[1]
-    s.bind(worker_addr)
+    s.bind('tcp://0.0.0.0:'+port)
     c = zerorpc.Client()
     c.connect(master_addr)
     c.register(ip, port)
