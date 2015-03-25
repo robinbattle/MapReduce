@@ -274,7 +274,7 @@ if __name__ == '__main__':
     master_addr = "tcp://" + sys.argv[1]
 
     s = zerorpc.Server(Worker())
-    ip = '0.0.0.0'
+    ip = sys.argv[1]
     port = sys.argv[2]
     s.bind('tcp://' + ip + ':' + port)
     c = zerorpc.Client()
